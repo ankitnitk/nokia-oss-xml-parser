@@ -97,4 +97,4 @@ See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ## License
 
-Personal / internal use. Not affiliated with Nokia.
+Personal project. Not affiliated with Nokia.
