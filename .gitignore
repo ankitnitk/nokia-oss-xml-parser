@@ -1,0 +1,26 @@
+# PyInstaller build artefacts
+build/
+build_v*/
+dist/
+*.spec.bak
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyd
+
+# User config (machine-specific)
+*.cfg
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Compiled executables (distributed via GitHub Releases, not committed)
+*.exe
+
+# Temporary files
+*.tmp
+*.log

@@ -1,0 +1,11 @@
+# Windows-native project — keep CRLF line endings
+* text=auto eol=crlf
+
+# Python source — LF preferred for cross-platform compatibility
+*.py text eol=lf
+
+# Spec files
+*.spec text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.cfg text eol=lf
