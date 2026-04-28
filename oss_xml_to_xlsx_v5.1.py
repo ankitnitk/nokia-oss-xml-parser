@@ -1052,7 +1052,10 @@ def convert_to_xlsb(xlsx_path, xlsb_path, _excel=None):
         _excel.Visible        = False
         _excel.DisplayAlerts  = False
         _excel.ScreenUpdating = False
-        _excel.Calculation    = -4135   # xlCalculationManual — skip recalc on open
+        try:
+            _excel.Calculation = -4135  # xlCalculationManual — skip recalc on open
+        except Exception:
+            pass   # non-critical optimisation; some headless sessions reject it
         _excel.EnableEvents   = False   # suppress add-in / macro events
     try:
         wb = _excel.Workbooks.Open(os.path.abspath(xlsx_path),
