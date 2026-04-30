@@ -2,6 +2,16 @@
 
 ---
 
+## Version 6.1 — April 2026
+
+### Improved — Sparse Record Flatten (Eliminates Dense Column Scan)
+`flatten_records` (called before each worker is submitted) previously iterated every column position for every record, calling `dict.get()` `n_cols` times per row regardless of how many params were actually filled. Nokia MO records are sparse — a class with 200 columns typically has only 25–40 filled params per record. The new `flatten_records_sparse` iterates only the actual keys present in each `(hier, rec)` pair and maps each key to its column index via a single dict lookup. For wide sparse classes this reduces per-record work from O(n\_cols) to O(filled\_keys) — typically 4–8× fewer dict operations.
+
+### Improved — Plain `dict` in Parser (No OrderedDict Overhead)
+`parse_mo_block` and `parse_dist_name` now use plain `dict` instead of `OrderedDict`. Python 3.7+ guarantees insertion-order preservation, so column ordering and output are byte-for-byte identical to V6.0. Plain dicts have lower allocation cost and are cheaper to pickle to worker subprocesses than the `OrderedDict` subclass.
+
+---
+
 ## Version 6.0 — April 2026
 
 ### New — Shared String Table (SST)
