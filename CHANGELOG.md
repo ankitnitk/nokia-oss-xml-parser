@@ -2,6 +2,19 @@
 
 ---
 
+## Version 6.0 — April 2026
+
+### New — Shared String Table (SST)
+String cell values are now stored in `xl/sharedStrings.xml` and referenced by index in each worksheet (`t="s"`), replacing per-cell inline strings (`t="inlineStr"`). SST cells are ~55 % shorter in raw XML — beneficial for large dumps with heavy enum/boolean repetition. A count-based filter ensures only strings that appear more than once enter the SST; unique identifiers such as `Dist_Name` remain as inlineStr, keeping the pickled SST dict small so subprocess IPC stays fast.
+
+### Improved — Column-Order Cache (Eliminates Redundant Record Scan)
+The per-class record scan that builds the column order is now folded into the SST pre-scan loop, caching results in `col_orders[cls]`. The write loop reuses the cached order directly — records are iterated once before workers start instead of twice.
+
+### New — Benchmark Script (`benchmark_v5_v6.py`)
+Side-by-side harness that runs V5.1 and V6.0 on the same input file(s) and prints a formatted comparison of wall-clock time, peak RAM, average CPU, and output file size. Requires `psutil` for RAM/CPU metrics (`pip install psutil`).
+
+---
+
 ## Version 5.1 — April 2026
 
 ### Improved — Streaming Worksheet XML (Constant-RAM Sheet Writing)
