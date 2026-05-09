@@ -1,6 +1,6 @@
 # Nokia OSS XML Parser
 
-A Windows desktop tool that converts Nokia OSS RAML XML configuration dumps into structured Excel workbooks (`.xlsx` / `.xlsb`), with optional 2G and 4G network summary reports.
+A Windows desktop tool that converts Nokia OSS RAML XML configuration dumps into structured Excel workbooks (`.xlsx` / `.xlsb`), with optional 2G, 4G, and HW Inventory summary reports.
 
 Built and maintained by **Ankit Jain**.
 
@@ -16,6 +16,7 @@ Built and maintained by **Ankit Jain**.
 - **Nested ZIP support** — input can be `.xml`, `.xml.gz`, `.zip`, or ZIPs containing further ZIPs.
 - **2G Summary report** — cell details (114 columns), BCF details, one-way ADCE neighbours, discrepant ADCE, co-site missing neighbours, frequency reuse, network statistics.
 - **4G Summary report** — LNBTS/LNCEL hierarchy, FDD/TDD split, EARFCNs, handover config, network statistics.
+- **HW Inventory report** — per-site unit counts (all states + working-only) and network-wide totals; columns grouped and colour-coded by hardware family (RMOD / BBMOD / SMOD / Others).
 - **XLSB output** — optional Excel Binary format via hidden COM automation (smaller files, faster to open in Excel).
 - **Config persistence** — MO class selection is saved between runs.
 
@@ -25,7 +26,7 @@ Built and maintained by **Ankit Jain**.
 
 - Windows 10/11
 - Python 3.10+ (to run from source)
-- Dependencies: `python-calamine`, `openpyxl`
+- Dependencies: `python-calamine`, `openpyxl`, `xlsxwriter`
 - For XLSB output: Microsoft Excel installed
 
 ---
@@ -51,13 +52,13 @@ Download the latest `OSS_XML_Parser_vX.X.exe` from [Releases](../../releases) an
 Requires [PyInstaller](https://pyinstaller.org/):
 
 ```
-pip install pyinstaller python-calamine openpyxl
+pip install pyinstaller python-calamine openpyxl xlsxwriter
 pyinstaller spec/OSS_XML_Parser_V6.1.spec --distpath dist_v61 --workpath build_v61
 ```
 
 The compiled exe will appear in `dist_v61/`.
 
-> **Note:** The spec file references `../2g_tool` and `../4g_tool` relative to its location in `spec/`. Run PyInstaller from the repo root as shown above.
+> **Note:** The spec file references `../2g_tool`, `../4g_tool`, and `../hw_tool` relative to its location in `spec/`. Run PyInstaller from the repo root as shown above.
 
 ---
 
@@ -96,6 +97,9 @@ nokia-oss-xml-parser/
 │   ├── xlsx_reader.py
 │   └── reports/
 │       └── lnbts_summary.py
+├── hw_tool/                  ← HW inventory report package
+│   ├── main.py
+│   └── report.py
 ├── spec/                     ← PyInstaller build specs
 │   ├── OSS_XML_Parser_V6.1.spec
 │   ├── OSS_XML_Parser_V6.0.spec
@@ -114,7 +118,7 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.1** | Sparse record flatten (`O(filled_keys)` vs `O(n_cols)`); plain `dict` parser |
+| **V6.1** | Sparse record flatten; plain `dict` parser; HW Inventory report (`hw_tool`) |
 | V6.0 | Shared String Table (SST); column-order cache |
 | V5.1 | Streaming worksheet XML; streaming ZIP assembly |
 | V5.0 | Pre-read snapshot (zero re-read); parallel ZIP parsing; dialog overlap |

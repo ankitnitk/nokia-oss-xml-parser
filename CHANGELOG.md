@@ -2,6 +2,25 @@
 
 ---
 
+## Version 6.1 — May 2026
+
+### New — HW Inventory Report (`hw_tool`)
+Added `hw_tool/` package that reads `INVUNIT` + `MRBTS`/`LNBTS` sheets from a parsed OSS dump and produces a 3-sheet Excel workbook:
+- **Site wise (All)** — one row per MRBTS, one column per `inventoryUnitType`, cell = total count. Row 0 is a colour-coded group banner (RMOD / BBMOD / SMOD / Others); frozen at row 2 / col 2.
+- **Site wise (Working)** — same layout filtered to `state=working` units only.
+- **Overall** — one row per `inventoryUnitType`: Working | Total | Group (colour-coded).
+
+Column ordering is driven by `vendorUnitFamilyType`: RMOD → BBMOD → SMOD → Others, alphabetical within each group.
+
+Integrated into the main parser (V6.1): a *Generate HW Report* checkbox appears in the post-parse dialog when INVUNIT + MRBTS/LNBTS classes are selected; output is saved as `<base>_HW_Report.xlsx`.
+
+Also integrated into `nokia-kpi-scripts/dump/DumpWatcher2.py` — HW dump jobs now auto-generate the report after conversion.
+
+### New — PyInstaller spec bundles `hw_tool`
+`spec/OSS_XML_Parser_V6.1.spec` includes `('../hw_tool', 'hw_tool')` so the compiled exe carries the HW report package.
+
+---
+
 ## Version 6.1 — April 2026
 
 ### Improved — Sparse Record Flatten (Eliminates Dense Column Scan)
