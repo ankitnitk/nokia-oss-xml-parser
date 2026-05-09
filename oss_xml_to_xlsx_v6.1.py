@@ -1589,14 +1589,15 @@ def _clean_tool_modules():
             del sys.modules[key]
 
 
-def _ask_summary_dialog(root, has_4g, has_2g):
+def _ask_summary_dialog(root, has_4g, has_2g, has_hw=False):
     """
-    Show a small Toplevel asking whether to generate 2G/4G summary reports.
-    Returns (want_4g: bool, want_2g: bool).  Both False if user clicks Skip.
+    Show a small Toplevel asking whether to generate summary reports.
+    Returns (want_4g: bool, want_2g: bool, want_hw: bool).
+    All False if user clicks Skip.
     """
     import tkinter as tk
 
-    result = [False, False]   # [want_4g, want_2g]
+    result = [False, False, False]   # [want_4g, want_2g, want_hw]
 
     dlg = tk.Toplevel(root)
     dlg.title('Generate Summary Reports?')
@@ -1608,6 +1609,7 @@ def _ask_summary_dialog(root, has_4g, has_2g):
 
     var_4g = tk.BooleanVar(value=has_4g)
     var_2g = tk.BooleanVar(value=has_2g)
+    var_hw = tk.BooleanVar(value=has_hw)
 
     if has_4g:
         tk.Checkbutton(dlg,
@@ -1619,12 +1621,18 @@ def _ask_summary_dialog(root, has_4g, has_2g):
                        text='  2G Summary   (BTS/BCF/BSC/TRX data found)',
                        variable=var_2g,
                        font=('Calibri', 10)).pack(padx=28, anchor='w')
+    if has_hw:
+        tk.Checkbutton(dlg,
+                       text='  HW Report    (INVUNIT + MRBTS/LNBTS data found)',
+                       variable=var_hw,
+                       font=('Calibri', 10)).pack(padx=28, anchor='w')
 
     tk.Label(dlg, text='', height=1).pack()   # spacer
 
     def _on_generate():
         result[0] = bool(var_4g.get()) if has_4g else False
         result[1] = bool(var_2g.get()) if has_2g else False
+        result[2] = bool(var_hw.get()) if has_hw else False
         dlg.destroy()
 
     def _on_skip():
@@ -1645,7 +1653,7 @@ def _ask_summary_dialog(root, has_4g, has_2g):
     dlg.geometry(f'+{(sw - w) // 2}+{(sh - h) // 2}')
 
     dlg.wait_window()
-    return result[0], result[1]
+    return result[0], result[1], result[2]
 
 
 def _run_4g_summary(input_file, output_path, pre_read=None):
@@ -1739,27 +1747,64 @@ def _run_2g_summary(input_file, output_path, pre_read=None):
         return False
 
 
+def _run_hw_report(input_file, output_path, pre_read=None):
+    """
+    Load hw_tool and build the HW inventory report.
+    If *pre_read* is supplied (dict of sheet_name -> rows), skip the xlsx read.
+    Returns True on success, False on error.
+    """
+    tool_dir = os.path.join(_tool_base_dir(), 'hw_tool')
+    if not os.path.isdir(tool_dir):
+        print(f'[{ts()}] HW: tool directory not found: {tool_dir}')
+        return False
+
+    _clean_tool_modules()
+    if tool_dir in sys.path:
+        sys.path.remove(tool_dir)
+    sys.path.insert(0, tool_dir)
+
+    try:
+        from main   import run_hw_report    # hw_tool/main.py
+        count = run_hw_report(
+            pre_read    = pre_read,
+            input_file  = input_file if pre_read is None else None,
+            output_path = output_path,
+            progress_fn = lambda m: tprint(f'  [HW] {m}'),
+        )
+        if count:
+            print(f'[{ts()}] HW: Done — {count} sites → '
+                  f'{os.path.basename(output_path)}')
+        return bool(count)
+
+    except Exception as exc:
+        print(f'[{ts()}] HW: ERROR — {exc}')
+        import traceback; traceback.print_exc()
+        return False
+
+
 def _post_process_summaries(output_file, class_names, root):
     """
-    After the main xlsx/xlsb is written, offer to generate 2G/4G summaries.
+    After the main xlsx/xlsb is written, offer to generate 2G/4G/HW summaries.
 
     output_file  — final output path (.xlsx or .xlsb)
     class_names  — iterable of MO class names present in the output
     root         — tkinter root window (for Toplevel dialog parenting)
 
     The output file is read in a background thread immediately (using the union
-    of all 2G + 4G needed sheets) while the summary dialog is shown.  By the
+    of all needed sheets) while the summary dialog is shown.  By the
     time the user clicks OK, the read is often already done.
     """
     class_set = set(class_names)
     has_4g = (bool(class_set & {'LNBTS', 'LNBTS_FDD', 'LNBTS_TDD'}) and
               bool(class_set & {'LNCEL', 'LNCEL_FDD', 'LNCEL_TDD'}))
     has_2g = {'BTS', 'BCF', 'BSC', 'TRX'}.issubset(class_set)
+    has_hw = ('INVUNIT' in class_set and
+              bool(class_set & {'MRBTS', 'LNBTS', 'LNBTS_FDD', 'LNBTS_TDD'}))
 
-    if not has_4g and not has_2g:
-        return 0.0, 0.0
+    if not has_4g and not has_2g and not has_hw:
+        return 0.0, 0.0, 0.0
 
-    # Load a reader module (2G and 4G tools share the same xlsx_reader interface).
+    # Load a reader module (all tools share the same xlsx_reader interface).
     tool_dir_2g = os.path.join(_tool_base_dir(), '2g_tool')
     _clean_tool_modules()
     if tool_dir_2g in sys.path:
@@ -1770,13 +1815,14 @@ def _post_process_summaries(output_file, class_names, root):
         from xlsx_reader import read_xlsx
     except Exception as exc:
         print(f'[{ts()}] Summary: failed to load xlsx_reader — {exc}')
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
 
-    # Union of all sheets that either summary tool might need.
+    # Union of all sheets that any summary tool might need.
     NEEDED_ALL = [
         'BSC', 'BCF', 'BTS', 'TRX', 'ADCE', 'ADJW', 'ADJL', 'HOC', 'POC', 'MAL',
         'LNBTS', 'LNBTS_FDD', 'LNBTS_TDD', 'LNCEL', 'LNCEL_FDD', 'LNCEL_TDD',
         'IRFIM', 'LNHOIF', 'SIB', 'REDRT', 'CAPR',
+        'INVUNIT', 'MRBTS',
     ]
 
     # Start reading the xlsx in background — overlaps with user time on dialog.
@@ -1796,11 +1842,11 @@ def _post_process_summaries(output_file, class_names, root):
     read_thread.start()
 
     # Show the dialog while reading runs in parallel.
-    want_4g, want_2g = _ask_summary_dialog(root, has_4g, has_2g)
+    want_4g, want_2g, want_hw = _ask_summary_dialog(root, has_4g, has_2g, has_hw)
 
-    if not want_4g and not want_2g:
+    if not want_4g and not want_2g and not want_hw:
         print(f'[{ts()}] Summary generation skipped.')
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
 
     # Wait for reading to finish (may already be done by the time user clicks OK).
     read_thread.join()
@@ -1808,11 +1854,11 @@ def _post_process_summaries(output_file, class_names, root):
     if _read_error[0]:
         print(f'[{ts()}] Summary: Read error — {_read_error[0]}')
         import traceback; traceback.print_exc()
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
 
     pre_read = _read_result['sheets']
     base = os.path.splitext(output_file)[0]
-    t_4g = t_2g = 0.0
+    t_4g = t_2g = t_hw = 0.0
 
     if want_4g:
         out_4g = _unique_path(f'{base}_4G_Summary.xlsx')
@@ -1826,7 +1872,13 @@ def _post_process_summaries(output_file, class_names, root):
         _run_2g_summary(output_file, out_2g, pre_read=pre_read)
         t_2g = (datetime.now() - t0).total_seconds()
 
-    return t_4g, t_2g
+    if want_hw:
+        out_hw = _unique_path(f'{base}_HW_Report.xlsx')
+        t0 = datetime.now()
+        _run_hw_report(output_file, out_hw, pre_read=pre_read)
+        t_hw = (datetime.now() - t0).total_seconds()
+
+    return t_4g, t_2g, t_hw
 
 
 # ---------------------------------------------------------------------------
@@ -1836,6 +1888,7 @@ def _post_process_summaries(output_file, class_names, root):
 def run_conversion(input_paths, output_path, filter_classes=None):
     t_total = datetime.now()
     print(f'[{ts()}] Output: {output_path}')
+    print(f'[{ts()}] XLSB_SUPPORTED: {XLSB_SUPPORTED}')
     merged, ordered_fi, t_parse = _parse_phase(input_paths, filter_classes)
     output_path, _, _, _ = _write_phase(merged, ordered_fi, output_path, t_parse)
     t_total = (datetime.now() - t_total).total_seconds()
@@ -2162,10 +2215,13 @@ def run_interactive():
     _has_4g = (bool(filter_classes & {'LNBTS', 'LNBTS_FDD', 'LNBTS_TDD'}) and
                bool(filter_classes & {'LNCEL', 'LNCEL_FDD', 'LNCEL_TDD'}))
     _has_2g = {'BTS', 'BCF', 'BSC', 'TRX'}.issubset(filter_classes)
-    want_4g = want_2g = False
-    if _has_4g or _has_2g:
-        want_4g, want_2g = _ask_summary_dialog(root, _has_4g, _has_2g)
-        if not want_4g and not want_2g:
+    _has_hw = ('INVUNIT' in filter_classes and
+               bool(filter_classes & {'MRBTS', 'LNBTS', 'LNBTS_FDD', 'LNBTS_TDD'}))
+    want_4g = want_2g = want_hw = False
+    if _has_4g or _has_2g or _has_hw:
+        want_4g, want_2g, want_hw = _ask_summary_dialog(
+            root, _has_4g, _has_2g, _has_hw)
+        if not want_4g and not want_2g and not want_hw:
             print(f'[{ts()}] Summary generation skipped.')
 
     # ── Step 5: Ask for output path (also runs while parsing is happening) ────
@@ -2224,6 +2280,7 @@ def run_interactive():
         'BSC', 'BCF', 'BTS', 'TRX', 'ADCE', 'ADJW', 'ADJL', 'HOC', 'POC', 'MAL',
         'LNBTS', 'LNBTS_FDD', 'LNBTS_TDD', 'LNCEL', 'LNCEL_FDD', 'LNCEL_TDD',
         'IRFIM', 'LNHOIF', 'SIB', 'REDRT', 'CAPR',
+        'INVUNIT', 'MRBTS',   # HW report
     }
     # Each entry in merged[cls] is a (hierarchy, record) tuple.
     # Hierarchy is a dict of {ClassName: id} pairs from parse_dist_name()
@@ -2323,8 +2380,8 @@ def run_interactive():
 
     # ── Step 10: Summaries on main thread + wait for XLSB ────────────────────
     # Summary build and XLSB conversion run simultaneously.
-    t_4g = t_2g = 0.0
-    if want_4g or want_2g:
+    t_4g = t_2g = t_hw = 0.0
+    if want_4g or want_2g or want_hw:
         if want_4g:
             out_4g = _unique_path(f'{summary_base}_4G_Summary.xlsx')
             t0 = datetime.now()
@@ -2335,6 +2392,11 @@ def run_interactive():
             t0 = datetime.now()
             _run_2g_summary(final_path, out_2g, pre_read=pre_read)
             t_2g = (datetime.now() - t0).total_seconds()
+        if want_hw:
+            out_hw = _unique_path(f'{summary_base}_HW_Report.xlsx')
+            t0 = datetime.now()
+            _run_hw_report(final_path, out_hw, pre_read=pre_read)
+            t_hw = (datetime.now() - t0).total_seconds()
 
     # Wait for XLSB to finish (may already be done if summary took longer).
     if xlsb_thread:
@@ -2378,6 +2440,8 @@ def run_interactive():
         grand_line += f'  |  4G Summary: {fmt_elapsed(t_4g)}'
     if t_2g:
         grand_line += f'  |  2G Summary: {fmt_elapsed(t_2g)}'
+    if t_hw:
+        grand_line += f'  |  HW Report: {fmt_elapsed(t_hw)}'
     grand_line += ')'
     print(grand_line)
 
