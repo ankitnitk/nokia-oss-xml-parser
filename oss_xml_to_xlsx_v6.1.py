@@ -1753,7 +1753,12 @@ def _run_hw_report(input_file, output_path, pre_read=None):
     If *pre_read* is supplied (dict of sheet_name -> rows), skip the xlsx read.
     Returns True on success, False on error.
     """
-    tool_dir = os.path.join(_tool_base_dir(), 'hw_tool')
+    # hw_tool lives alongside the main script (inside the repo / _MEIPASS).
+    # Unlike 2g_tool/4g_tool which are one level above the script on disk,
+    # hw_tool is bundled directly with oss_xml_to_xlsx — use the script dir.
+    _script_dir = (sys._MEIPASS if getattr(sys, 'frozen', False)
+                   else os.path.dirname(os.path.abspath(__file__)))
+    tool_dir = os.path.join(_script_dir, 'hw_tool')
     if not os.path.isdir(tool_dir):
         print(f'[{ts()}] HW: tool directory not found: {tool_dir}')
         return False

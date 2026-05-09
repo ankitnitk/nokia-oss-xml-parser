@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('../2g_tool', '2g_tool'), ('../4g_tool', '4g_tool')]
+datas = [('../2g_tool', '2g_tool'), ('../4g_tool', '4g_tool'), ('../hw_tool', 'hw_tool')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('xlsxwriter')
