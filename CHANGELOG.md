@@ -2,6 +2,13 @@
 
 ---
 
+## Version 6.1.2 — May 2026
+
+### Improved — Rotated Column Headers in Parsed Output
+All column-header cells (row 1 of every parsed sheet) now use **Rotate Text Up** (`textRotation="90"`) with **horizontal and vertical centre** alignment. This makes wide sheets with many columns far more readable — narrow column widths are sufficient since the text reads vertically, and the header row height naturally expands to fit. Change implemented in `STYLES_XML` (`s=1` xf): `<alignment horizontal="center" vertical="center" textRotation="90"/>`.
+
+---
+
 ## Version 6.1 — May 2026
 
 ### New — HW Inventory Report (`hw_tool`)

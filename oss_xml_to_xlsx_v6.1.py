@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OSS XML to XLSX Converter  — Version 6.1  (Sparse Flatten + dict Parser)
+OSS XML to XLSX Converter  — Version 6.1.2  (Rotated Column Headers)
 Converts Nokia OSS RAML XML dump files to Excel format.
 
 Key improvements over V6.0:
@@ -156,7 +156,7 @@ STYLES_XML = b'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
 <cellXfs count="3">
   <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-  <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+  <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" textRotation="90"/></xf>
   <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
 </cellXfs>
 </styleSheet>'''
@@ -763,7 +763,7 @@ def generate_info_sheet_xml(files_info, class_names):
 
     # Row 2: title
     parts.append(f'<row r="{row}">')
-    parts.append(_cell_xml(1, row, 'Created with OSS XML Converter  --  V6.1', style=1))
+    parts.append(_cell_xml(1, row, 'Created with OSS XML Converter  --  V6.1.2', style=1))
     parts.append('</row>')
     row += 1
 
@@ -2024,7 +2024,7 @@ class ProgressWindow:
         self._after_id = None   # set by _poll; cancelled by _on_close
 
         self.win = tk.Toplevel(parent)
-        self.win.title("OSS XML Parser  V6.1")
+        self.win.title("OSS XML Parser  V6.1.2")
         self.win.resizable(False, False)
         self.win.protocol('WM_DELETE_WINDOW', lambda: None)  # locked while working
 
@@ -2472,7 +2472,7 @@ def _wait_for_keypress():
 
 
 def main():
-    os.system("title Ankit's XML Parser  [V6.1 - Sparse Flatten + SST]")
+    os.system("title Ankit's XML Parser  [V6.1.2 - Rotated Headers]")
 
     if len(sys.argv) == 1:
         try:
@@ -2483,7 +2483,7 @@ def main():
             _wait_for_keypress()
         return
 
-    parser = argparse.ArgumentParser(description='OSS XML -> Excel Converter V6.1 (Sparse Flatten + SST)')
+    parser = argparse.ArgumentParser(description='OSS XML -> Excel Converter V6.1.2 (Rotated Headers)')
     parser.add_argument('inputs',    nargs='+', metavar='FILE')
     parser.add_argument('-o', '--output',  default='')
     parser.add_argument('--classes', default='')

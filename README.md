@@ -53,7 +53,7 @@ Requires [PyInstaller](https://pyinstaller.org/):
 
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
-pyinstaller spec/OSS_XML_Parser_V6.1.spec --distpath dist_v61 --workpath build_v61
+pyinstaller spec/OSS_XML_Parser_V6.1.2.spec --distpath dist_v612 --workpath build_v612
 ```
 
 The compiled exe will appear in `dist_v61/`.
@@ -118,7 +118,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.1** | Sparse record flatten; plain `dict` parser; HW Inventory report (`hw_tool`) |
+| **V6.1.2** | Rotated column headers (`textRotation=90`, centred) in all parsed sheets |
+| V6.1 | Sparse record flatten; plain `dict` parser; HW Inventory report (`hw_tool`) |
 | V6.0 | Shared String Table (SST); column-order cache |
 | V5.1 | Streaming worksheet XML; streaming ZIP assembly |
 | V5.0 | Pre-read snapshot (zero re-read); parallel ZIP parsing; dialog overlap |

@@ -1,0 +1,28 @@
+# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(6, 1, 2, 0),
+    prodvers=(6, 1, 2, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(u'040904B0', [
+        StringStruct(u'CompanyName',      u'Ankit Jain'),
+        StringStruct(u'FileDescription',  u'OSS XML to Excel Converter'),
+        StringStruct(u'FileVersion',      u'6.1.2.0'),
+        StringStruct(u'InternalName',     u'OSS_XML_Parser_V612'),
+        StringStruct(u'LegalCopyright',   u'Created by Ankit Jain'),
+        StringStruct(u'OriginalFilename', u'OSS_XML_Parser_v6.1.2.exe'),
+        StringStruct(u'ProductName',      u'XML Parser AJ'),
+        StringStruct(u'ProductVersion',   u'6.1.2'),
+      ])
+    ]),
+    VarFileInfo([VarStruct(u'Translation', [0x0409, 1200])])
+  ]
+)
