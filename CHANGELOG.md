@@ -11,6 +11,15 @@ All column-header cells (row 1 of every parsed sheet) now use **Rotate Text Up**
 
 ## Version 6.1 — May 2026
 
+### Improved (2G Summary) — NSEI and PSEI columns in Cell Details
+Two columns appended to the **Cell Details** sheet:
+- **NSEI** — NS Entity Identifier, read from the master BTS record (`nsei` field).
+- **PSEI** — Packet Switching Entity Identifier, read from the master BTS record (`psei` field).
+
+Both are written as numbers (added to `_NUMERIC_COLS`).
+
+---
+
 ### New — HW Inventory Report (`hw_tool`)
 Added `hw_tool/` package that reads `INVUNIT` + `MRBTS`/`LNBTS` sheets from a parsed OSS dump and produces a 3-sheet Excel workbook:
 - **Site wise (All)** — one row per MRBTS, one column per `inventoryUnitType`, cell = total count. Row 0 is a colour-coded group banner (RMOD / BBMOD / SMOD / Others); frozen at row 2 / col 2.

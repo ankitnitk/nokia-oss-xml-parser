@@ -114,6 +114,8 @@ COLUMNS = [
     _col('Slave CDEF Count',     lambda s, n: n.channel_type_counts(s)['cdef_slave']),
     _col('Master Cell ID',       lambda s, n: get(_master(s), 'cellId')[1:]
                                      if get(_master(s), 'cellId') else ''),
+    _col('NSEI',                 lambda s, n: get(_master(s), 'nsei')),
+    _col('PSEI',                 lambda s, n: get(_master(s), 'psei')),
 ]
 
 # Columns whose values should be written as numbers (not text)
@@ -124,7 +126,7 @@ _NUMERIC_COLS = {
     'Power Reduction 900', 'Power Reduction 1x00',
     'Master LSEG', 'Slave LSEG',
     'FRL', 'FRU', 'AFRL', 'AFRU', 'BLT',
-    'Master Cell ID',
+    'Master Cell ID', 'NSEI', 'PSEI',
 }
 
 
@@ -152,6 +154,7 @@ _COL_WIDTHS = [
      8,  8,  8,  8,  8,                                   # FRL, FRU, AFRL, AFRU, BLT
     12, 18, 20, 12, 12, 18,                                # ADCE, One-Way ADCE, Discrepant ADCE, ADJW, ADJL, Diff LAC ADCE
     12, 12, 18, 12, 16, 14, 16, 14, 16, 14, 14,            # SDCCH, CCCH, Not-Used RTSL, TCH, GTCH/CDED/CDEF M+S, Master Cell ID
+    10, 10,                                                 # NSEI, PSEI
 ]
 
 
