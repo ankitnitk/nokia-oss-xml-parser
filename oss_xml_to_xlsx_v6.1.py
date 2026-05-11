@@ -687,7 +687,7 @@ def generate_worksheet_xml(cls_name, flat_records, all_cols, n_hier,
 
     # Row 2: headers (style=3 — blue header with 90° rotation, height capped at 250pt)
     col_letters = [_col_letter(i) for i in range(n_cols)]
-    parts.append('<row r="2" ht="250" customHeight="1">')
+    parts.append('<row r="2" ht="95" customHeight="1">')
     for ci, col_name in enumerate(all_cols):
         if sst_dict is not None:
             idx = sst_dict.get(col_name, -1)
@@ -891,7 +891,7 @@ def _stream_worksheet_xml(xml_path, flat_records, all_cols, n_hier, sst_dict):
             w('<sheetData><row r="1"><c r="A1" s="2" t="inlineStr"><is><t>Info</t></is></c></row>')
 
         # Row 2: header row — rotated (s=3), height capped at 250pt
-        hdr = ['<row r="2" ht="250" customHeight="1">']
+        hdr = ['<row r="2" ht="95" customHeight="1">']
         for ci, col_name in enumerate(all_cols):
             if sst_dict is not None:
                 idx = sst_dict.get(col_name, -1)

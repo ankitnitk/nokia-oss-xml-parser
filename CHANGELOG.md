@@ -9,7 +9,7 @@ Data sheet column-header cells (row 2 of every MO class sheet) now use **Rotate 
 
 Implementation details:
 - A new style `s=3` (blue header + `textRotation="90"`) is added to `STYLES_XML`; `s=1` (blue header, no rotation) is preserved unchanged for the **Info** sheet, which does **not** get rotated headers.
-- Header row height is pinned to **250 pt** (`ht="250" customHeight="1"`) so the row never expands beyond that regardless of column-name length.
+- Header row height is pinned to **95 pt** (~250 px) (`ht="95" customHeight="1"`) so the row never expands beyond that regardless of column-name length.
 - Applied in both the in-memory path (`generate_worksheet_xml`) and the streaming path (`_stream_worksheet_xml`).
 
 ---
