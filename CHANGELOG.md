@@ -5,7 +5,12 @@
 ## Version 6.1.2 — May 2026
 
 ### Improved — Rotated Column Headers in Parsed Output
-All column-header cells (row 1 of every parsed sheet) now use **Rotate Text Up** (`textRotation="90"`) with **horizontal and vertical centre** alignment. This makes wide sheets with many columns far more readable — narrow column widths are sufficient since the text reads vertically, and the header row height naturally expands to fit. Change implemented in `STYLES_XML` (`s=1` xf): `<alignment horizontal="center" vertical="center" textRotation="90"/>`.
+Data sheet column-header cells (row 2 of every MO class sheet) now use **Rotate Text Up** (`textRotation="90"`) with horizontal and vertical centre alignment. This makes wide sheets with many columns far more readable — narrow column widths are sufficient since the text reads vertically.
+
+Implementation details:
+- A new style `s=3` (blue header + `textRotation="90"`) is added to `STYLES_XML`; `s=1` (blue header, no rotation) is preserved unchanged for the **Info** sheet, which does **not** get rotated headers.
+- Header row height is pinned to **250 pt** (`ht="250" customHeight="1"`) so the row never expands beyond that regardless of column-name length.
+- Applied in both the in-memory path (`generate_worksheet_xml`) and the streaming path (`_stream_worksheet_xml`).
 
 ---
 
