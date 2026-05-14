@@ -1,6 +1,6 @@
 # Nokia OSS XML Parser
 
-A Windows desktop tool that converts Nokia OSS RAML XML configuration dumps into structured Excel workbooks (`.xlsx` / `.xlsb`), with optional 2G, 4G, and HW Inventory summary reports.
+A Windows desktop tool that converts Nokia OSS RAML XML configuration dumps into structured Excel workbooks (`.xlsx` / `.xlsb`), with optional 2G, 3G, 4G, and HW Inventory summary reports.
 
 Built and maintained by **Ankit Jain**.
 
@@ -15,6 +15,7 @@ Built and maintained by **Ankit Jain**.
 - **Streaming ZIP assembly** — sheets copied into the xlsx zip in chunks; no full in-memory copy.
 - **Nested ZIP support** — input can be `.xml`, `.xml.gz`, `.zip`, or ZIPs containing further ZIPs.
 - **2G Summary report** — cell details (114 columns), BCF details, one-way ADCE neighbours, discrepant ADCE, co-site missing neighbours, frequency reuse, network statistics.
+- **3G Summary report** — WCDMA cell details: RNC/WBTS/WCEL hierarchy, Admin State, LAC/RAC, PSC, UARFCN, Tilt, CPICH, PMAX.
 - **4G Summary report** — LNBTS/LNCEL hierarchy, FDD/TDD split, EARFCNs, handover config, network statistics.
 - **HW Inventory report** — per-site unit counts (all states + working-only) and network-wide totals; columns grouped and colour-coded by hardware family (RMOD / BBMOD / SMOD / Others).
 - **XLSB output** — optional Excel Binary format via hidden COM automation (smaller files, faster to open in Excel).
@@ -36,7 +37,7 @@ Built and maintained by **Ankit Jain**.
 ### Run from source
 
 ```
-python oss_xml_to_xlsx_v6.1.py
+python oss_xml_to_xlsx_v6.2.py
 ```
 
 A GUI dialog will open to select input files and MO classes. Output is saved as `.xlsx` (or `.xlsb` if selected).
@@ -53,12 +54,12 @@ Requires [PyInstaller](https://pyinstaller.org/):
 
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
-pyinstaller spec/OSS_XML_Parser_V6.1.2.spec --distpath dist_v612 --workpath build_v612
+pyinstaller spec/OSS_XML_Parser_V6.2.spec --distpath dist_v62 --workpath build_v62
 ```
 
-The compiled exe will appear in `dist_v61/`.
+The compiled exe will appear in `dist_v62/`.
 
-> **Note:** The spec file references `../2g_tool`, `../4g_tool`, and `../hw_tool` relative to its location in `spec/`. Run PyInstaller from the repo root as shown above.
+> **Note:** The spec file references `../2g_tool`, `../3g_tool`, `../4g_tool`, and `../hw_tool` relative to its location in `spec/`. Run PyInstaller from the repo root as shown above.
 
 ---
 
@@ -80,11 +81,19 @@ Requires `psutil` for RAM/CPU metrics (`pip install psutil`).
 
 ```
 nokia-oss-xml-parser/
-├── oss_xml_to_xlsx_v6.1.py   ← current release (V6.1)
-├── oss_xml_to_xlsx_v6.0.py   ← previous release (V6.0)
+├── oss_xml_to_xlsx_v6.2.py   ← current release (V6.2)
+├── oss_xml_to_xlsx_v6.1.py   ← previous release (V6.1)
+├── oss_xml_to_xlsx_v6.0.py
 ├── oss_xml_to_xlsx_v5.1.py   ← stable baseline (V5.1)
 ├── benchmark_v5_v6.py        ← side-by-side benchmark harness
 ├── 2g_tool/                  ← 2G summary report package
+│   ├── main.py
+│   ├── network.py
+│   ├── xlsb_reader.py
+│   ├── xlsx_reader.py
+│   └── reports/
+│       └── cell_summary.py
+├── 3g_tool/                  ← 3G WCDMA summary report package
 │   ├── main.py
 │   ├── network.py
 │   ├── xlsb_reader.py
@@ -101,9 +110,12 @@ nokia-oss-xml-parser/
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
-│   ├── OSS_XML_Parser_V6.1.spec
+│   ├── OSS_XML_Parser_V6.2.spec
+│   ├── OSS_XML_Parser_V6.1.2.spec
 │   ├── OSS_XML_Parser_V6.0.spec
 │   ├── OSS_XML_Parser_V5.1.spec
+│   ├── version_info_v62.txt
+│   ├── version_info_v612.txt
 │   ├── version_info_v61.txt
 │   ├── version_info_v6.txt
 │   └── version_info_v5.txt
@@ -118,7 +130,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.1.2** | Rotated column headers (`textRotation=90`, centred) in all parsed sheets |
+| **V6.2** | 3G WCDMA summary report (`3g_tool`) integrated into main parser |
+| V6.1.2 | Rotated column headers (`textRotation=90`, centred) in all parsed sheets |
 | V6.1 | Sparse record flatten; plain `dict` parser; HW Inventory report (`hw_tool`) |
 | V6.0 | Shared String Table (SST); column-order cache |
 | V5.1 | Streaming worksheet XML; streaming ZIP assembly |
