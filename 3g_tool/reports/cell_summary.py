@@ -20,6 +20,7 @@ COLUMNS = [
     'SBTS',
     'WCEL ID',
     'WCEL Name',
+    'Admin State',
     'LAC',
     'RAC',
     'PSC',
@@ -37,6 +38,7 @@ _NUMERIC_COLS = {
 _COL_WIDTHS = [
     10, 22, 10, 22, 14,   # RNC ID/Name, WBTS ID/Name, SBTS
     10, 22,               # WCEL ID/Name
+    13,                   # Admin State
     10, 10,               # LAC, RAC
      8, 10,               # PSC, UARFCN
      8, 10, 10,           # Tilt, CPICH, PMAX
@@ -128,21 +130,25 @@ def _build_rows(network):
         pmax_raw = to_num(get(wncel_r, 'maxCarrierPower'), default=None)
         pmax     = round(pmax_raw / 10, 1) if pmax_raw is not None else ''
 
+        admin_raw = get(wcel_r, 'AdminCellState')
+        admin_state = 'Working' if admin_raw == '1' else 'Down' if admin_raw != '' else ''
+
         rows.append({
-            'RNC ID':    get(rnc_r, 'RNC') or rnc_id,
-            'RNC Name':  get(rnc_r, 'name'),
-            'WBTS ID':   get(wbts_r, 'WBTS') or wbts_id,
-            'WBTS Name': get(wbts_r, 'name'),
-            'SBTS':      get(wbts_r, 'SBTSId'),
-            'WCEL ID':   wcel_id,
-            'WCEL Name': get(wcel_r, 'name'),
-            'LAC':       get(wcel_r, 'LAC'),
-            'RAC':       get(wcel_r, 'RAC'),
-            'PSC':       get(wcel_r, 'PriScrCode'),
-            'UARFCN':    get(wcel_r, 'UARFCN'),
-            'Tilt':      get(wcel_r, 'angle'),
-            'CPICH':     cpich,
-            'PMAX':      pmax,
+            'RNC ID':      get(rnc_r, 'RNC') or rnc_id,
+            'RNC Name':    get(rnc_r, 'name'),
+            'WBTS ID':     get(wbts_r, 'WBTS') or wbts_id,
+            'WBTS Name':   get(wbts_r, 'name'),
+            'SBTS':        get(wbts_r, 'SBTSId'),
+            'WCEL ID':     wcel_id,
+            'WCEL Name':   get(wcel_r, 'name'),
+            'Admin State': admin_state,
+            'LAC':         get(wcel_r, 'LAC'),
+            'RAC':         get(wcel_r, 'RAC'),
+            'PSC':         get(wcel_r, 'PriScrCode'),
+            'UARFCN':      get(wcel_r, 'UARFCN'),
+            'Tilt':        get(wcel_r, 'angle'),
+            'CPICH':       cpich,
+            'PMAX':        pmax,
         })
 
     rows.sort(key=lambda r: (
