@@ -23,10 +23,11 @@ Added `3g_tool/` package that reads a Nokia 3G WCDMA parameter dump (`.xlsx` / `
 | PSC | `WCEL` | `PriScrCode` |
 | UARFCN | `WCEL` | `UARFCN` |
 | Tilt | `WCEL` | `angle` |
-| CPICH | `WCEL` | `PtxPrimaryCPICH` |
-| PMAX | `WCEL` | `maximumTransmissionPower` |
+| CPICH | `WCEL` | `PtxPrimaryCPICH` ÷ 10 |
+| CPICH | `WCEL` | `PtxPrimaryCPICH` ÷ 10 |
+| PMAX | `WNCEL` | `maxCarrierPower` ÷ 10 (matched on WNCEL = WCEL) |
 
-Minimum required sheets: **RNC, WBTS, WCEL**.
+Minimum required sheets: **RNC, WBTS, WCEL, WNCEL**.
 Supports both calamine (fast) and built-in XLSB parser fallback, same as the 2G tool.
 
 ---

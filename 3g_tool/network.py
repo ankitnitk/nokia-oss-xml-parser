@@ -66,7 +66,7 @@ def _wcel_dn(rnc, wbts, wcel):
 # ---------------------------------------------------------------------------
 
 class Network:
-    NEEDED_SHEETS = ['RNC', 'WBTS', 'WCEL']
+    NEEDED_SHEETS = ['RNC', 'WBTS', 'WCEL', 'WNCEL']
 
     def __init__(self, sheets):
         for sn in self.NEEDED_SHEETS:
@@ -95,15 +95,28 @@ class Network:
             if dn and dn not in self.wcel_by_dn:
                 self.wcel_by_dn[dn] = r
 
+        # WNCEL — keyed by parent WCEL DN (WNCEL ID == WCEL ID)
+        self.wncel_by_wcel_dn = {}
+        for r in sheets.get('WNCEL', []):
+            rnc  = get(r, 'RNC')
+            wbts = get(r, 'WBTS')
+            wcel = get(r, 'WCEL')
+            if not (rnc and wbts and wcel):
+                continue
+            key = _wcel_dn(rnc, wbts, wcel)
+            if key not in self.wncel_by_wcel_dn:
+                self.wncel_by_wcel_dn[key] = r
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
 _DN_PATTERNS = {
-    'RNC':  lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}",
-    'WBTS': lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}/WBTS-{get(r, 'WBTS')}",
-    'WCEL': lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}/WBTS-{get(r, 'WBTS')}/WCEL-{get(r, 'WCEL')}",
+    'RNC':   lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}",
+    'WBTS':  lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}/WBTS-{get(r, 'WBTS')}",
+    'WCEL':  lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}/WBTS-{get(r, 'WBTS')}/WCEL-{get(r, 'WCEL')}",
+    'WNCEL': lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}/WBTS-{get(r, 'WBTS')}/WCEL-{get(r, 'WCEL')}/WNCEL-{get(r, 'WNCEL')}",
 }
 
 
@@ -119,8 +132,10 @@ def _fill_dist_names(sheet_name, records):
         rnc = get(rec, 'RNC')
         if not rnc:
             continue
-        if sheet_name in ('WBTS', 'WCEL') and not get(rec, 'WBTS'):
+        if sheet_name in ('WBTS', 'WCEL', 'WNCEL') and not get(rec, 'WBTS'):
             continue
-        if sheet_name == 'WCEL' and not get(rec, 'WCEL'):
+        if sheet_name in ('WCEL', 'WNCEL') and not get(rec, 'WCEL'):
+            continue
+        if sheet_name == 'WNCEL' and not get(rec, 'WNCEL'):
             continue
         rec['Dist_Name'] = pattern(rec)
