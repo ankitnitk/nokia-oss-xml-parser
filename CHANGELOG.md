@@ -2,6 +2,21 @@
 
 ---
 
+## Version 6.2 — May 2026
+
+### New — 3G Summary integrated into main parser (`oss_xml_to_xlsx_v6.2.py`)
+The 3G WCDMA summary tool is now integrated into the main OSS XML parser, following the same pattern as 2G/4G summaries:
+
+- A **Generate 3G Summary** checkbox appears in the post-parse dialog when `RNC`, `WBTS`, and `WCEL` classes are selected.
+- Output is saved as `<base>_3G_Summary.xlsx`.
+- Uses the pre-read snapshot (no re-read of the output file) — same zero-re-read optimisation as 2G/4G.
+- `WNCEL` sheet is included in the snapshot for PMAX lookup even if not explicitly selected, as long as it was parsed.
+- 3G summary timing shown in the Grand Total line.
+
+Minimum required classes: **RNC, WBTS, WCEL** (WNCEL included automatically when present).
+
+---
+
 ## Version 6.1.2 — May 2026
 
 ### New — 3G WCDMA Summary Tool (`3g_tool`)
