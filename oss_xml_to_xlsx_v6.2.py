@@ -1757,11 +1757,16 @@ def _run_2g_summary(input_file, output_path, pre_read=None):
 
 def _run_3g_summary(input_file, output_path, pre_read=None):
     """
-    Load the 3G tool from ../3g_tool/, build the summary, write to *output_path*.
+    Load the 3G tool from 3g_tool/ (alongside the script), build the summary,
+    write to *output_path*.
     If *pre_read* is supplied (dict of sheet_name -> rows), skip the xlsx read.
     Returns True on success, False on error.
     """
-    tool_dir = os.path.join(_tool_base_dir(), '3g_tool')
+    # 3g_tool lives inside the repo / _MEIPASS bundle alongside this script,
+    # not as a sibling repo — use the script dir (same as hw_tool).
+    _script_dir = (sys._MEIPASS if getattr(sys, 'frozen', False)
+                   else os.path.dirname(os.path.abspath(__file__)))
+    tool_dir = os.path.join(_script_dir, '3g_tool')
     if not os.path.isdir(tool_dir):
         print(f'[{ts()}] 3G: tool directory not found: {tool_dir}')
         return False
