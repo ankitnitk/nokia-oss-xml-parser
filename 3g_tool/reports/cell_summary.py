@@ -5,7 +5,7 @@ One row per WCEL, sorted by RNC ID → WBTS ID → WCEL ID.
 """
 
 import xlsxwriter
-from network import get, to_num, _rnc_dn, _wbts_dn, _wcel_dn
+from network import get, to_num, _rnc_dn, _wbts_dn
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +119,8 @@ def _build_rows(network):
         rnc_r   = network.rnc_by_dn.get(_rnc_dn(rnc_id), {})
         wbts_r  = network.wbts_by_dn.get(_wbts_dn(rnc_id, wbts_id), {})
         wcel_id = get(wcel_r, 'WCEL')
-        wncel_r = network.wncel_by_wcel_dn.get(_wcel_dn(rnc_id, wbts_id, wcel_id), {})
+        sbts_id = get(wbts_r, 'SBTSId')
+        wncel_r = network.wncel_by_mrbts_wcel.get((sbts_id, wcel_id), {})
 
         cpich_raw = to_num(get(wcel_r, 'PtxPrimaryCPICH'), default=None)
         cpich     = round(cpich_raw / 10, 1) if cpich_raw is not None else ''

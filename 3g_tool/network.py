@@ -1,15 +1,15 @@
 """
 network.py
-3G WCDMA network model. Reads RNC, WBTS and WCEL sheets, fills missing
-Dist_Names, and builds indexed lookups used by report builders.
+3G WCDMA network model. Reads RNC, WBTS, WCEL and WNCEL sheets, fills
+missing Dist_Names, and builds indexed lookups used by report builders.
 
 Hierarchy:
     RNC
     └── WBTS  (Node B)
         └── WCEL  (cell)
 
-DN format:
-    PLMN-PLMN/RNC-{rncId}/WBTS-{wbtsId}/WCEL-{wcelId}
+WNCEL lives under the MRBTS hierarchy (multiradio) and is joined to WCEL
+by: WNCEL.WNCEL == WCEL.WCEL  AND  WNCEL.MRBTS == WBTS.SBTSId
 """
 
 from collections import defaultdict
@@ -95,17 +95,16 @@ class Network:
             if dn and dn not in self.wcel_by_dn:
                 self.wcel_by_dn[dn] = r
 
-        # WNCEL — keyed by parent WCEL DN (WNCEL ID == WCEL ID)
-        self.wncel_by_wcel_dn = {}
+        # WNCEL — keyed by (MRBTS, WNCEL) where MRBTS=SBTSId and WNCEL=WCEL ID
+        self.wncel_by_mrbts_wcel = {}
         for r in sheets.get('WNCEL', []):
-            rnc  = get(r, 'RNC')
-            wbts = get(r, 'WBTS')
-            wcel = get(r, 'WCEL')
-            if not (rnc and wbts and wcel):
+            mrbts = get(r, 'MRBTS')
+            wncel = get(r, 'WNCEL')
+            if not (mrbts and wncel):
                 continue
-            key = _wcel_dn(rnc, wbts, wcel)
-            if key not in self.wncel_by_wcel_dn:
-                self.wncel_by_wcel_dn[key] = r
+            key = (mrbts, wncel)
+            if key not in self.wncel_by_mrbts_wcel:
+                self.wncel_by_mrbts_wcel[key] = r
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +115,7 @@ _DN_PATTERNS = {
     'RNC':   lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}",
     'WBTS':  lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}/WBTS-{get(r, 'WBTS')}",
     'WCEL':  lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}/WBTS-{get(r, 'WBTS')}/WCEL-{get(r, 'WCEL')}",
-    'WNCEL': lambda r: f"PLMN-PLMN/RNC-{get(r, 'RNC')}/WBTS-{get(r, 'WBTS')}/WCEL-{get(r, 'WCEL')}/WNCEL-{get(r, 'WNCEL')}",
+    'WNCEL': lambda r: f"PLMN-PLMN/MRBTS-{get(r, 'MRBTS')}/WNCEL-{get(r, 'WNCEL')}",
 }
 
 
@@ -129,13 +128,15 @@ def _fill_dist_names(sheet_name, records):
         dn = str(rec.get('Dist_Name', '')).strip()
         if dn and dn.lower() not in ('nan', 'none', ''):
             continue
-        rnc = get(rec, 'RNC')
-        if not rnc:
-            continue
-        if sheet_name in ('WBTS', 'WCEL', 'WNCEL') and not get(rec, 'WBTS'):
-            continue
-        if sheet_name in ('WCEL', 'WNCEL') and not get(rec, 'WCEL'):
-            continue
-        if sheet_name == 'WNCEL' and not get(rec, 'WNCEL'):
-            continue
+        if sheet_name == 'WNCEL':
+            if not get(rec, 'MRBTS') or not get(rec, 'WNCEL'):
+                continue
+        else:
+            rnc = get(rec, 'RNC')
+            if not rnc:
+                continue
+            if sheet_name in ('WBTS', 'WCEL') and not get(rec, 'WBTS'):
+                continue
+            if sheet_name == 'WCEL' and not get(rec, 'WCEL'):
+                continue
         rec['Dist_Name'] = pattern(rec)
