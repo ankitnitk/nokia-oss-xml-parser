@@ -15,6 +15,11 @@ The 3G WCDMA summary tool is now integrated into the main OSS XML parser, follow
 
 Minimum required classes: **RNC, WBTS, WCEL** (WNCEL included automatically when present).
 
+### Improved — Admin State column in 3G Cell Details
+Added **Admin State** column (after WCEL Name) to the 3G summary Cell Details sheet:
+- Source: `WCEL` sheet, `AdminCellState` field
+- `1` → `Working`, any other value → `Down`
+
 ---
 
 ## Version 6.1.2 — May 2026
