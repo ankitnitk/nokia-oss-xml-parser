@@ -4,6 +4,33 @@
 
 ## Version 6.1.2 — May 2026
 
+### New — 3G WCDMA Summary Tool (`3g_tool`)
+Added `3g_tool/` package that reads a Nokia 3G WCDMA parameter dump (`.xlsx` / `.xlsb`) and produces a single-sheet `_3G_summary.xlsx`:
+
+**Cell Details** — one row per WCEL, sorted by RNC → WBTS → WCEL ID:
+
+| Column | Sheet | Field |
+|---|---|---|
+| RNC ID | `RNC` | `RNC` |
+| RNC Name | `RNC` | `name` |
+| WBTS ID | `WBTS` | `WBTS` |
+| WBTS Name | `WBTS` | `name` |
+| SBTS | `WBTS` | `SBTSId` |
+| WCEL ID | `WCEL` | `WCEL` |
+| WCEL Name | `WCEL` | `name` |
+| LAC | `WCEL` | `LAC` |
+| RAC | `WCEL` | `RAC` |
+| PSC | `WCEL` | `PriScrCode` |
+| UARFCN | `WCEL` | `UARFCN` |
+| Tilt | `WCEL` | `angle` |
+| CPICH | `WCEL` | `PtxPrimaryCPICH` |
+| PMAX | `WCEL` | `maximumTransmissionPower` |
+
+Minimum required sheets: **RNC, WBTS, WCEL**.
+Supports both calamine (fast) and built-in XLSB parser fallback, same as the 2G tool.
+
+---
+
 ### Improved — Rotated Column Headers in Parsed Output
 Data sheet column-header cells (row 2 of every MO class sheet) now use **Rotate Text Up** (`textRotation="90"`) with horizontal and vertical centre alignment. This makes wide sheets with many columns far more readable — narrow column widths are sufficient since the text reads vertically.
 
