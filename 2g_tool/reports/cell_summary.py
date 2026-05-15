@@ -201,6 +201,7 @@ def build(network, output_path, progress_fn=None, neighbour_checks=False):
     _base   = {'font_name': 'Arial', 'font_size': 9, 'valign': 'vcenter', 'bold': True}
     red_fmt = wb.add_format({**_base, **_border, 'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
     yel_fmt = wb.add_format({**_base, **_border, 'bg_color': '#FFEB9C', 'font_color': '#9C6500'})
+    blu_fmt = wb.add_format({**_base, **_border, 'bg_color': '#9DC3E6', 'font_color': '#1F3864'})
 
     # --- Cell Summary sheet ---
     ws = wb.add_worksheet('Cell Details')
@@ -223,7 +224,8 @@ def build(network, output_path, progress_fn=None, neighbour_checks=False):
     rac_col      = next((ci for ci, c in enumerate(COLUMNS) if c['label'] == 'RAC'),      None)
     cell_id_col  = next((ci for ci, c in enumerate(COLUMNS) if c['label'] == 'Cell ID'),  None)
     bcch_flag = {}     # seg_dn -> 'red' | 'yellow'
-    tch_flag  = {}     # seg_dn -> 'red' | 'yellow'
+    tch_flag  = {}     # seg_dn -> 'red' | 'yellow'  (BCF-level check)
+    tch_blue  = set()  # seg_dns where adjacent TCH exists within the same sector
     lac_red   = set()  # seg_dns where LAC is inconsistent within BCF
     rac_red   = set()  # seg_dns where RAC is inconsistent within BCF
     cell_id_flag = {}  # seg_dn -> 'red' | 'yellow'  (only populated for duplicates)
@@ -304,6 +306,15 @@ def build(network, output_path, progress_fn=None, neighbour_checks=False):
                     if flag:
                         tch_flag[seg_dn] = flag
 
+                    # Blue check: adjacent TCH within the same sector (segment).
+                    # Tighter than yellow — checks adjacency among this segment's
+                    # own freqs only, not the whole BCF pool.
+                    if len(seg_tch_freqs) >= 2:
+                        seg_freq_set = set(seg_tch_freqs)
+                        if any((f - 1) in seg_freq_set or (f + 1) in seg_freq_set
+                               for f in seg_tch_freqs):
+                            tch_blue.add(seg_dn)
+
         # -- LAC / RAC consistency check --
         lacs = {seg_dn: get(seg.get('master') or {}, 'locationAreaIdLAC')
                 for seg_dn, seg in seg_list}
@@ -325,8 +336,13 @@ def build(network, output_path, progress_fn=None, neighbour_checks=False):
                 val = ''
             if   ci == bcch_col     and seg_dn in bcch_flag:
                 cell_fmt = red_fmt if bcch_flag[seg_dn] == 'red' else yel_fmt
-            elif ci == tch_freq_col and seg_dn in tch_flag:
-                cell_fmt = red_fmt if tch_flag[seg_dn]  == 'red' else yel_fmt
+            elif ci == tch_freq_col and (seg_dn in tch_flag or seg_dn in tch_blue):
+                if tch_flag.get(seg_dn) == 'red':
+                    cell_fmt = red_fmt
+                elif seg_dn in tch_blue:
+                    cell_fmt = blu_fmt
+                else:
+                    cell_fmt = yel_fmt
             elif ci == lac_col      and seg_dn in lac_red:
                 cell_fmt = red_fmt
             elif ci == rac_col      and seg_dn in rac_red:
