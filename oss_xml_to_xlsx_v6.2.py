@@ -1666,11 +1666,14 @@ def _ask_summary_dialog(root, has_4g, has_2g, has_hw=False, has_3g=False):
 
 def _run_4g_summary(input_file, output_path, pre_read=None):
     """
-    Load the 4G tool from ../4g_tool/, build the summary, write to *output_path*.
+    Load the 4G tool from 4g_tool/ (alongside the script), build the summary,
+    write to *output_path*.
     If *pre_read* is supplied (dict of sheet_name -> rows), skip the xlsx read.
     Returns True on success, False on error.
     """
-    tool_dir = os.path.join(_tool_base_dir(), '4g_tool')
+    _script_dir = (sys._MEIPASS if getattr(sys, 'frozen', False)
+                   else os.path.dirname(os.path.abspath(__file__)))
+    tool_dir = os.path.join(_script_dir, '4g_tool')
     if not os.path.isdir(tool_dir):
         print(f'[{ts()}] 4G: tool directory not found: {tool_dir}')
         return False
@@ -1710,11 +1713,14 @@ def _run_4g_summary(input_file, output_path, pre_read=None):
 
 def _run_2g_summary(input_file, output_path, pre_read=None):
     """
-    Load the 2G tool from ../2g_tool/, build the summary, write to *output_path*.
+    Load the 2G tool from 2g_tool/ (alongside the script), build the summary,
+    write to *output_path*.
     If *pre_read* is supplied (dict of sheet_name -> rows), skip the xlsx read.
     Returns True on success, False on error.
     """
-    tool_dir = os.path.join(_tool_base_dir(), '2g_tool')
+    _script_dir = (sys._MEIPASS if getattr(sys, 'frozen', False)
+                   else os.path.dirname(os.path.abspath(__file__)))
+    tool_dir = os.path.join(_script_dir, '2g_tool')
     if not os.path.isdir(tool_dir):
         print(f'[{ts()}] 2G: tool directory not found: {tool_dir}')
         return False
@@ -1867,7 +1873,9 @@ def _post_process_summaries(output_file, class_names, root):
         return 0.0, 0.0, 0.0, 0.0
 
     # Load a reader module (all tools share the same xlsx_reader interface).
-    tool_dir_2g = os.path.join(_tool_base_dir(), '2g_tool')
+    _script_dir = (sys._MEIPASS if getattr(sys, 'frozen', False)
+                   else os.path.dirname(os.path.abspath(__file__)))
+    tool_dir_2g = os.path.join(_script_dir, '2g_tool')
     _clean_tool_modules()
     if tool_dir_2g in sys.path:
         sys.path.remove(tool_dir_2g)
@@ -1877,7 +1885,7 @@ def _post_process_summaries(output_file, class_names, root):
         from xlsx_reader import read_xlsx
     except Exception as exc:
         print(f'[{ts()}] Summary: failed to load xlsx_reader — {exc}')
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
 
     # Union of all sheets that any summary tool might need.
     NEEDED_ALL = [
