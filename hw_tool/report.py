@@ -127,7 +127,10 @@ def _make_formats(wb, group_colors, group_font_colors):
     int_cell  = wb.add_format({
         'border': 1, 'align': 'center', 'valign': 'vcenter', 'num_format': '0',
     })
-    return col_hdr, grp_fmt, grp_cell_fmt, str_cell, num_cell, zero_cell, int_cell
+    coord_cell = wb.add_format({
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'num_format': '0.000000',
+    })
+    return col_hdr, grp_fmt, grp_cell_fmt, str_cell, num_cell, zero_cell, int_cell, coord_cell
 
 
 # ---------------------------------------------------------------------------
@@ -150,13 +153,25 @@ def build_hw_report(sheets, output_path):
     mrbts_rows   = sheets.get('MRBTS',   [])
     lnbts_rows   = sheets.get('LNBTS',   [])
 
-    # ── Site-name lookup: MRBTS id (str) → site name ─────────────────────────
+    # ── Site-name / coordinate lookup ────────────────────────────────────────
     site_name = {}
+    site_lat  = {}
+    site_lng  = {}
     for row in (mrbts_rows or lnbts_rows):
         mid  = row.get('MRBTS')
         name = row.get('name') or row.get('btsName')
-        if mid is not None and name:
-            site_name[str(mid)] = str(name)
+        if mid is None:
+            continue
+        key = str(mid)
+        if name:
+            site_name[key] = str(name)
+        for dest, field in ((site_lat, 'latitude'), (site_lng, 'longitude')):
+            raw = row.get(field)
+            if raw is not None:
+                try:
+                    dest[key] = float(raw) / 10_000_000
+                except (ValueError, TypeError):
+                    pass
 
     # ── Aggregate INVUNIT rows ───────────────────────────────────────────────
     all_counts     = defaultdict(lambda: defaultdict(int))
@@ -202,7 +217,7 @@ def build_hw_report(sheets, output_path):
     inv_group = {t: _group_key(fam_map[t]) for t in all_inv_types}
 
     # Consecutive group spans: list of (group, first_inv_col_idx, last_inv_col_idx)
-    # inv_col_idx is 0-based within all_inv_types; sheet col = inv_col_idx + 2
+    # inv_col_idx is 0-based within all_inv_types; sheet col = inv_col_idx + 4
     spans = _group_spans(all_inv_types, fam_map)
 
     # Sort MRBTS numerically
@@ -210,28 +225,28 @@ def build_hw_report(sheets, output_path):
 
     # ── Write workbook ───────────────────────────────────────────────────────
     wb = xlsxwriter.Workbook(output_path)
-    col_hdr_fmt, grp_fmt, grp_cell_fmt, str_fmt, num_fmt, zero_fmt, int_fmt = \
+    col_hdr_fmt, grp_fmt, grp_cell_fmt, str_fmt, num_fmt, zero_fmt, int_fmt, coord_fmt = \
         _make_formats(wb, _GROUP_COLORS, _GROUP_FONT_COLORS)
 
     def _write_site_sheet(ws_name, count_dict):
         ws = wb.add_worksheet(ws_name)
-        # freeze at row 2 (below group banner + header), col 2 (after MRBTS + Site Name)
-        ws.freeze_panes(2, 2)
+        # freeze at row 2 (below group banner + header), col 4 (after MRBTS + Site Name + Lat + Lng)
+        ws.freeze_panes(2, 4)
         ws.set_zoom(85)
         ws.set_default_row(15)
 
         n_inv = len(all_inv_types)
-        n_hdr = n_inv + 2   # total columns
+        n_hdr = n_inv + 4   # total columns (MRBTS, Site Name, Lat, Lng, + inv types)
 
         # ── Row 0: group banner ───────────────────────────────────────────────
         ws.set_row(0, 18)
-        # First two columns: blank with dark-blue header style
-        ws.write(0, 0, '', col_hdr_fmt)
-        ws.write(0, 1, '', col_hdr_fmt)
+        # First four columns: blank with dark-blue header style
+        for c in range(4):
+            ws.write(0, c, '', col_hdr_fmt)
 
         for grp, i_start, i_end in spans:
-            c_start = i_start + 2   # sheet column
-            c_end   = i_end   + 2
+            c_start = i_start + 4   # sheet column (offset by 4 fixed cols)
+            c_end   = i_end   + 4
             label   = _GROUP_LABELS[grp]
             fmt     = grp_fmt[grp]
             if c_start == c_end:
@@ -243,20 +258,33 @@ def build_hw_report(sheets, output_path):
         ws.set_row(1, 45)
         ws.write(1, 0, 'MRBTS',     col_hdr_fmt)
         ws.write(1, 1, 'Site Name', col_hdr_fmt)
-        for c, inv_type in enumerate(all_inv_types, start=2):
+        ws.write(1, 2, 'Latitude',  col_hdr_fmt)
+        ws.write(1, 3, 'Longitude', col_hdr_fmt)
+        for c, inv_type in enumerate(all_inv_types, start=4):
             ws.write(1, c, inv_type, col_hdr_fmt)
 
         # ── Column widths ─────────────────────────────────────────────────────
         ws.set_column(0, 0, 10)           # MRBTS
         ws.set_column(1, 1, 32)           # Site Name
-        ws.set_column(2, n_hdr - 1, 9)   # count columns
+        ws.set_column(2, 3, 14)           # Latitude, Longitude
+        ws.set_column(4, n_hdr - 1, 9)   # count columns
 
         # ── Data rows (start at row 2) ────────────────────────────────────────
         for r, mrbts in enumerate(all_mrbts, start=2):
             mrbts_val = int(mrbts) if mrbts.isdigit() else mrbts
             ws.write(r, 0, mrbts_val, int_fmt)
             ws.write(r, 1, site_name.get(mrbts, ''), str_fmt)
-            for c, inv_type in enumerate(all_inv_types, start=2):
+            lat = site_lat.get(mrbts)
+            lng = site_lng.get(mrbts)
+            if lat is not None:
+                ws.write(r, 2, lat, coord_fmt)
+            else:
+                ws.write_blank(r, 2, None, str_fmt)
+            if lng is not None:
+                ws.write(r, 3, lng, coord_fmt)
+            else:
+                ws.write_blank(r, 3, None, str_fmt)
+            for c, inv_type in enumerate(all_inv_types, start=4):
                 cnt = count_dict[mrbts].get(inv_type, 0)
                 if cnt:
                     ws.write(r, c, cnt, num_fmt)
