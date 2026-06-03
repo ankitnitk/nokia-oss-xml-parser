@@ -20,6 +20,15 @@ Added **Admin State** column (after WCEL Name) to the 3G summary Cell Details sh
 - Source: `WCEL` sheet, `AdminCellState` field
 - `1` → `Working`, any other value → `Down`
 
+### Improved — Latitude / Longitude columns in HW Report site-wise sheets
+Added **Latitude** and **Longitude** columns (after Site Name, before unit-type counts) to both "Site wise (All)" and "Site wise (Working)" sheets:
+- Source: `MRBTS` sheet, `latitude` and `longitude` fields (raw internal value ÷ 10,000,000)
+- Displayed with 6 decimal places; blank when not present in the dump.
+- Freeze panes updated to col 4 to keep all four fixed columns (MRBTS, Site Name, Lat, Lng) visible while scrolling.
+
+### Improved — Pink highlight for duplicate RSI + EARFCN DL in 4G LNCEL Details
+If 2 or more LNCELs under the **same MRBTS** share the same combination of **RSI** and **EARFCN DL**, their RSI cells are highlighted in pink.
+
 ---
 
 ## Version 6.1.2 — May 2026
