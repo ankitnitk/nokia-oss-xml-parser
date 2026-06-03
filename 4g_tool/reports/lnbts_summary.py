@@ -34,8 +34,9 @@ def _make_formats(wb):
     tdd   = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#E2EFDA'})
     mixed = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFF2CC'})
     red   = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
+    pink  = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFBFCE', 'font_color': '#7B004F'})
     return dict(hdr=hdr, cell=cell, num=num, dec1=dec1, dec2=dec2,
-                fdd=fdd, tdd=tdd, mixed=mixed, red=red)
+                fdd=fdd, tdd=tdd, mixed=mixed, red=red, pink=pink)
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +172,16 @@ def _build_lncel_details(wb, fmt, network, log, rows):
             tac_by_lnbts[rd['LNBTS ID']].add(tac)
     inconsistent_tac_lnbts = {k for k, v in tac_by_lnbts.items() if len(v) > 1}
 
+    # Pre-compute duplicate (MRBTS, RSI, EARFCN DL) combos within the same MRBTS
+    rsi_earfcn_count = defaultdict(int)
+    for rd in rows:
+        mrbts  = rd.get('MRBTS ID', '')
+        rsi    = rd.get('RSI', '')
+        earfcn = rd.get('EARFCN DL', '')
+        if rsi != '' and earfcn != '':
+            rsi_earfcn_count[(mrbts, rsi, earfcn)] += 1
+    dup_rsi_earfcn = {k for k, v in rsi_earfcn_count.items() if v > 1}
+
     for ri, rd in enumerate(rows, 1):
         cell_type      = rd.get('Cell Type', '')
         row_fmt        = fmt['fdd'] if cell_type == 'FDD' else fmt['tdd'] if cell_type == 'TDD' else fmt['cell']
@@ -179,11 +190,19 @@ def _build_lncel_details(wb, fmt, network, log, rows):
         capr_missing   = rd.get('_capr_missing', False)
         tac_red        = rd.get('LNBTS ID', '') in inconsistent_tac_lnbts
 
+        mrbts_id = rd.get('MRBTS ID', '')
         for ci, col in enumerate(_LNCEL_COLS):
             val = rd.get(col, '')
             if col in _LNCEL_NUM:
                 n = to_num(val)
-                if n != 0 or val != '':
+                if col == 'RSI':
+                    earfcn = rd.get('EARFCN DL', '')
+                    f = fmt['pink'] if (mrbts_id, val, earfcn) in dup_rsi_earfcn else fmt['num']
+                    if n != 0 or val != '':
+                        ws.write_number(ri, ci, n, f)
+                    else:
+                        ws.write_blank(ri, ci, f)
+                elif n != 0 or val != '':
                     ws.write_number(ri, ci, n, fmt['num'])
                 else:
                     ws.write_blank(ri, ci, fmt['num'])
