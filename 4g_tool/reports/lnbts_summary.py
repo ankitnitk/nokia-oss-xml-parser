@@ -3,9 +3,11 @@ lnbts_summary.py
 Builds the 4G LTE summary report Excel file.
 
 Sheets:
-  1. LNBTS Details  — one row per LNBTS (≈ BCF Details in 2G)
-  2. LNCEL Details  — one row per cell (FDD or TDD)
-  3. Network Stats  — Working / Other / Total summary
+  1. LNBTS Details      — one row per LNBTS (≈ BCF Details in 2G)
+  2. LNCEL Details      — one row per cell (FDD or TDD)
+  3. InterFreq HO Check — one row per (cell × LNHOIF frequency relation),
+                          with measurement-vs-HO-trigger threshold validation
+  4. Network Stats      — Working / Other / Total summary
 """
 
 import math
@@ -55,6 +57,7 @@ def build(network, output_path, progress_fn=None):
     _build_lnbts_details(wb, fmt, network, log)
     lncel_rows = list(_iter_lncel_rows(network))
     _build_lncel_details(wb, fmt, network, log, lncel_rows)
+    _build_interfreq_ho_check(wb, fmt, network, log, lncel_rows)
     _build_network_stats(wb, fmt, network, log, lncel_rows)
 
     wb.close()
@@ -136,6 +139,7 @@ _LNCEL_COLS = [
     'MCC', 'MNC', 'PCI', 'RSI', 'EARFCN DL', 'Ch BW (MHz)',
     'PMAX (dBm)', 'dlRsBoost', 'RS Power (dBm)', 'DL MIMO Mode', 'Array Mode', 'TAC', 'Tilt',
     'Cell Type', 'SIB Priority', 'IRFIM {Prio} List', 'LNHOIF List', 'CAPR {Prio} List',
+    't2 Start (dBm)', 't2a Stop (dBm)', 'HO Thr Issue',
 ]
 _LNCEL_NUM = {
     'MRBTS ID', 'LNBTS ID', 'LNCEL ID', 'PCI', 'RSI', 'EARFCN DL', 'SIB Priority',
@@ -150,6 +154,7 @@ _LNCEL_WIDTHS = {
     'PMAX (dBm)': 11, 'dlRsBoost': 11, 'RS Power (dBm)': 14, 'DL MIMO Mode': 32, 'Array Mode': 28,
     'TAC': 8, 'Tilt': 7, 'Cell Type': 9,
     'SIB Priority': 12, 'IRFIM {Prio} List': 40, 'LNHOIF List': 40, 'CAPR {Prio} List': 40,
+    't2 Start (dBm)': 13, 't2a Stop (dBm)': 13, 'HO Thr Issue': 22,
 }
 
 
@@ -233,6 +238,21 @@ def _build_lncel_details(wb, fmt, network, log, rows):
                 ws.write(ri, ci, val, fmt['red'] if lnhoif_missing else fmt['cell'])
             elif col == 'CAPR {Prio} List':
                 ws.write(ri, ci, val, fmt['red'] if capr_missing else fmt['cell'])
+            elif col == 't2 Start (dBm)':
+                n = to_num(val, default=None)
+                if n is not None:
+                    ws.write_number(ri, ci, n, fmt['num'])
+                else:
+                    ws.write_blank(ri, ci, fmt['num'])
+            elif col == 't2a Stop (dBm)':
+                f = fmt['red'] if rd.get('_stop_low') else fmt['num']
+                n = to_num(val, default=None)
+                if n is not None:
+                    ws.write_number(ri, ci, n, f)
+                else:
+                    ws.write_blank(ri, ci, f)
+            elif col == 'HO Thr Issue':
+                ws.write(ri, ci, val, fmt['red'] if rd.get('_ho_issue') else fmt['cell'])
             else:
                 ws.write(ri, ci, val, fmt['cell'])
 
@@ -373,6 +393,30 @@ def _iter_lncel_rows(network):
         lnhoif_list    = ', '.join(str(int(f)) for f in lnhoif_freqs)
         lnhoif_missing = bool(required - set(lnhoif_freqs))
 
+        # ── Inter-freq measurement vs HO-trigger threshold check ──────────────
+        # All four thresholds use the RSRP offset dBm = raw - 140, so raw-value
+        # comparisons are identical to dBm comparisons (the 2 dB tolerance too).
+        t2_raw  = to_num(get(lncel_rec, 'threshold2InterFreq'), default=None)
+        t2a_raw = to_num(get(lncel_rec, 'threshold2a'),         default=None)
+        t2_dbm  = (t2_raw  - 140) if t2_raw  is not None else ''
+        t2a_dbm = (t2a_raw - 140) if t2a_raw is not None else ''
+
+        # Rule B (cell-level): measurement stop must be >= start + 2 dB.
+        stop_low = (t2a_raw is not None and t2_raw is not None
+                    and t2a_raw < t2_raw + 2)
+
+        # Rule A (per-relation): HO trigger must not sit > 2 dB below meas start.
+        ho_issue_freqs = []
+        for r in network.lnhoif_list_by_lncel_dn.get(lncel_k, []):
+            tgt    = to_num(get(r, 'eutraCarrierInfo'),    default=None)
+            t3_raw = to_num(get(r, 'threshold3InterFreq'), default=None)
+            if (tgt is not None and t3_raw is not None and t2_raw is not None
+                    and t3_raw < t2_raw - 2):
+                ho_issue_freqs.append(int(tgt))
+        ho_issue_freqs = sorted(set(ho_issue_freqs))
+        ho_issue = ('Yes: ' + ', '.join(str(f) for f in ho_issue_freqs)
+                    if ho_issue_freqs else '')
+
         # Build CAPR list as "freq {prio}" sorted by descending sFreqPrio
         capr_freq_prio = {}   # freq → highest prio seen
         for r in network.capr_list_by_lncel_dn.get(lncel_k, []):
@@ -417,14 +461,136 @@ def _iter_lncel_rows(network):
             'IRFIM {Prio} List': irfim_list,
             'LNHOIF List':     lnhoif_list,
             'CAPR {Prio} List': capr_list,
+            't2 Start (dBm)':  t2_dbm,
+            't2a Stop (dBm)':  t2a_dbm,
+            'HO Thr Issue':    ho_issue,
             '_irfim_missing':  irfim_missing,
             '_lnhoif_missing': lnhoif_missing,
             '_capr_missing':   capr_missing,
+            '_stop_low':       stop_low,
+            '_ho_issue':       bool(ho_issue_freqs),
+            '_lncel_k':        lncel_k,
+            '_t2_raw':         t2_raw,
+            '_t2a_raw':        t2a_raw,
         }
 
 
 # ---------------------------------------------------------------------------
-# Sheet 3 — Network Stats
+# Sheet 3 — InterFreq HO Check  (one row per cell × LNHOIF frequency relation)
+# ---------------------------------------------------------------------------
+
+_HOCHK_COLS = [
+    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'LNCEL Name', 'LNCEL ID',
+    'Serving EARFCN', 't2 Start (dBm)', 't2a Stop (dBm)',
+    'Target EARFCN', 't3 Trigger (dBm)', 't3a Target (dBm)',
+    'Trigger Gap (dB)', 'HO Trigger Mismatch', 'Meas Stop Low',
+]
+_HOCHK_NUM = {
+    'MRBTS ID', 'LNBTS ID', 'LNCEL ID', 'Serving EARFCN',
+    't2 Start (dBm)', 't2a Stop (dBm)', 'Target EARFCN',
+    't3 Trigger (dBm)', 't3a Target (dBm)', 'Trigger Gap (dB)',
+}
+_HOCHK_WIDTHS = {
+    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'LNCEL Name': 22,
+    'LNCEL ID': 9, 'Serving EARFCN': 14, 't2 Start (dBm)': 13, 't2a Stop (dBm)': 13,
+    'Target EARFCN': 13, 't3 Trigger (dBm)': 15, 't3a Target (dBm)': 15,
+    'Trigger Gap (dB)': 15, 'HO Trigger Mismatch': 19, 'Meas Stop Low': 14,
+}
+
+
+def _build_interfreq_ho_check(wb, fmt, network, log, lncel_rows):
+    log('Building InterFreq HO Check sheet...')
+    ws = wb.add_worksheet('InterFreq HO Check')
+    ws.freeze_panes(1, 0)
+
+    for ci, col in enumerate(_HOCHK_COLS):
+        ws.write(0, ci, col, fmt['hdr'])
+    ws.set_row(0, 30)
+
+    rows = list(_iter_interfreq_ho_rows(network, lncel_rows))
+    n_mismatch = sum(1 for r in rows if r['_mismatch'])
+    log(f'  {len(rows):,} frequency relations  —  {n_mismatch:,} trigger mismatches')
+
+    for ri, rd in enumerate(rows, 1):
+        row_bad = rd['_mismatch']
+        for ci, col in enumerate(_HOCHK_COLS):
+            val = rd.get(col, '')
+            if col == 'Meas Stop Low':
+                # cell-level flag — red whenever the cell fails Rule B
+                f = fmt['red'] if rd['_stop_low'] else (fmt['red'] if row_bad else fmt['cell'])
+                ws.write(ri, ci, val, f)
+            elif col == 'HO Trigger Mismatch':
+                ws.write(ri, ci, val, fmt['red'] if row_bad else fmt['cell'])
+            elif col in _HOCHK_NUM:
+                base = fmt['red'] if row_bad else fmt['num']
+                n = to_num(val, default=None)
+                if n is not None:
+                    ws.write_number(ri, ci, n, base)
+                else:
+                    ws.write_blank(ri, ci, base)
+            else:
+                ws.write(ri, ci, val, fmt['red'] if row_bad else fmt['cell'])
+
+    for ci, col in enumerate(_HOCHK_COLS):
+        ws.set_column(ci, ci, _HOCHK_WIDTHS.get(col, 15))
+    ws.autofilter(0, 0, len(rows), len(_HOCHK_COLS) - 1)
+
+
+def _iter_interfreq_ho_rows(network, lncel_rows):
+    """Explode each cell into one row per LNHOIF frequency relation."""
+    for rd in lncel_rows:
+        lncel_k  = rd.get('_lncel_k', '')
+        t2_raw   = rd.get('_t2_raw')
+        t2a_raw  = rd.get('_t2a_raw')
+        stop_low = rd.get('_stop_low', False)
+        t2_dbm   = (t2_raw  - 140) if t2_raw  is not None else ''
+        t2a_dbm  = (t2a_raw - 140) if t2a_raw is not None else ''
+
+        relations = network.lnhoif_list_by_lncel_dn.get(lncel_k, [])
+        # Sort by target EARFCN for stable, readable ordering
+        rel_sorted = sorted(
+            relations,
+            key=lambda r: to_num(get(r, 'eutraCarrierInfo'), default=0),
+        )
+        for r in rel_sorted:
+            tgt     = to_num(get(r, 'eutraCarrierInfo'),    default=None)
+            t3_raw  = to_num(get(r, 'threshold3InterFreq'), default=None)
+            t3a_raw = to_num(get(r, 'threshold3aInterFreq'), default=None)
+            if tgt is None:
+                continue
+            t3_dbm  = (t3_raw  - 140) if t3_raw  is not None else ''
+            t3a_dbm = (t3a_raw - 140) if t3a_raw is not None else ''
+
+            if t3_raw is not None and t2_raw is not None:
+                gap = t2_raw - t3_raw            # how far below meas-start the trigger sits
+                mismatch = gap > 2
+                gap_val  = gap
+            else:
+                gap_val  = ''
+                mismatch = False
+
+            yield {
+                'MRBTS ID':            rd.get('MRBTS ID', ''),
+                'LNBTS ID':            rd.get('LNBTS ID', ''),
+                'LNBTS Name':          rd.get('LNBTS Name', ''),
+                'LNCEL Name':          rd.get('LNCEL Name', ''),
+                'LNCEL ID':            rd.get('LNCEL ID', ''),
+                'Serving EARFCN':      rd.get('EARFCN DL', ''),
+                't2 Start (dBm)':      t2_dbm,
+                't2a Stop (dBm)':      t2a_dbm,
+                'Target EARFCN':       int(tgt),
+                't3 Trigger (dBm)':    t3_dbm,
+                't3a Target (dBm)':    t3a_dbm,
+                'Trigger Gap (dB)':    gap_val,
+                'HO Trigger Mismatch': f'YES ({gap_val} dB)' if mismatch else '',
+                'Meas Stop Low':       'YES' if stop_low else '',
+                '_mismatch':           mismatch,
+                '_stop_low':           stop_low,
+            }
+
+
+# ---------------------------------------------------------------------------
+# Sheet 4 — Network Stats
 # ---------------------------------------------------------------------------
 
 def _build_network_stats(wb, fmt, network, log, lncel_rows):
