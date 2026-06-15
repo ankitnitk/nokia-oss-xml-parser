@@ -7,7 +7,9 @@
 ### New — Measurement-vs-HO-trigger threshold validation in 4G Summary
 Added inter-frequency threshold consistency checks to the 4G LTE summary report (`4g_tool/reports/lnbts_summary.py`). All four thresholds use the RSRP offset `dBm = raw − 140`.
 
-**Rule A (per frequency relation):** `LNHOIF.threshold3InterFreq` (HO trigger) must not sit more than 2 dB below `LNCEL.threshold2InterFreq` (measurement start). A relation where `threshold3InterFreq < threshold2InterFreq − 2` means the UE starts measuring but the HO trigger waits until the signal is much worse — flagged as a mismatch.
+**Rule A (per frequency relation):** `LNHOIF.threshold3InterFreq` (HO trigger) must sit within `[threshold2InterFreq − 2, threshold2InterFreq]`. Two ways it can fail:
+- `threshold3InterFreq < threshold2InterFreq − 2` → trigger too far *below* measurement start (UE measures but HO waits until signal is much worse) — `"trigger N dB low"`.
+- `threshold3InterFreq > threshold2InterFreq` → trigger sits *above* measurement start (HO would fire before measurement even begins) — `"trigger N dB high"`.
 
 **Rule B (per cell):** `LNCEL.threshold2a` (measurement stop) must be at least 2 dB better than `threshold2InterFreq` (start), i.e. `threshold2a ≥ threshold2InterFreq + 2`.
 
@@ -15,7 +17,7 @@ Added inter-frequency threshold consistency checks to the 4G LTE summary report 
 
 Presented two ways:
 - **LNCEL Details** sheet — 3 new columns (`t2 Start (dBm)`, `t2a Stop (dBm)`, `HO Thr Issue`); the `t2a Stop` cell turns red on Rule B failure, and `HO Thr Issue` lists the offending target EARFCNs (red) when any relation fails Rule A.
-- **InterFreq HO Check** sheet (new) — one row per cell × LNHOIF frequency relation, with serving/target EARFCN, all four thresholds in dBm, the trigger gap, and both rule flags; offending rows highlighted red, autofilter on the flag columns for bulk auditing.
+- **InterFreq HO Check** sheet (new) — one row per cell × LNHOIF frequency relation, with serving/target EARFCN, all four thresholds in dBm, the signed trigger gap, both rule flags (low/high reason text), and the relation's `LNHOIF Dist_Name` for reference; offending rows highlighted red, autofilter on the flag columns for bulk auditing.
 
 Picked up automatically by `DumpWatcher2.py`'s scheduled 4G summary (runs `4g_tool` from source). Rebuild the exe to bundle it into the standalone parser.
 

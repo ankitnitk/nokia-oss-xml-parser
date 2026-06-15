@@ -405,13 +405,15 @@ def _iter_lncel_rows(network):
         stop_low = (t2a_raw is not None and t2_raw is not None
                     and t2a_raw < t2_raw + 2)
 
-        # Rule A (per-relation): HO trigger must not sit > 2 dB below meas start.
+        # Rule A (per-relation): HO trigger must sit within [t2 - 2, t2].
+        #   t3 < t2 - 2  → trigger too far below meas start
+        #   t3 > t2      → trigger above meas start (fires before measuring begins)
         ho_issue_freqs = []
         for r in network.lnhoif_list_by_lncel_dn.get(lncel_k, []):
             tgt    = to_num(get(r, 'eutraCarrierInfo'),    default=None)
             t3_raw = to_num(get(r, 'threshold3InterFreq'), default=None)
             if (tgt is not None and t3_raw is not None and t2_raw is not None
-                    and t3_raw < t2_raw - 2):
+                    and (t3_raw < t2_raw - 2 or t3_raw > t2_raw)):
                 ho_issue_freqs.append(int(tgt))
         ho_issue_freqs = sorted(set(ho_issue_freqs))
         ho_issue = ('Yes: ' + ', '.join(str(f) for f in ho_issue_freqs)
@@ -484,6 +486,7 @@ _HOCHK_COLS = [
     'Serving EARFCN', 't2 Start (dBm)', 't2a Stop (dBm)',
     'Target EARFCN', 't3 Trigger (dBm)', 't3a Target (dBm)',
     'Trigger Gap (dB)', 'HO Trigger Mismatch', 'Meas Stop Low',
+    'LNHOIF Dist_Name',
 ]
 _HOCHK_NUM = {
     'MRBTS ID', 'LNBTS ID', 'LNCEL ID', 'Serving EARFCN',
@@ -495,6 +498,7 @@ _HOCHK_WIDTHS = {
     'LNCEL ID': 9, 'Serving EARFCN': 14, 't2 Start (dBm)': 13, 't2a Stop (dBm)': 13,
     'Target EARFCN': 13, 't3 Trigger (dBm)': 15, 't3a Target (dBm)': 15,
     'Trigger Gap (dB)': 15, 'HO Trigger Mismatch': 19, 'Meas Stop Low': 14,
+    'LNHOIF Dist_Name': 58,
 }
 
 
@@ -561,13 +565,22 @@ def _iter_interfreq_ho_rows(network, lncel_rows):
             t3_dbm  = (t3_raw  - 140) if t3_raw  is not None else ''
             t3a_dbm = (t3a_raw - 140) if t3a_raw is not None else ''
 
+            # Valid window: t2 - 2 <= t3 <= t2.  gap = t2 - t3 (signed):
+            #   gap > 2  → trigger sits too far BELOW meas start
+            #   gap < 0  → trigger sits ABOVE meas start (t3 > t2)
             if t3_raw is not None and t2_raw is not None:
-                gap = t2_raw - t3_raw            # how far below meas-start the trigger sits
-                mismatch = gap > 2
-                gap_val  = gap
+                gap = t2_raw - t3_raw
+                gap_val = gap
+                if gap > 2:
+                    mismatch, reason = True, f'YES (trigger {gap} dB low)'
+                elif gap < 0:
+                    mismatch, reason = True, f'YES (trigger {-gap} dB high)'
+                else:
+                    mismatch, reason = False, ''
             else:
                 gap_val  = ''
                 mismatch = False
+                reason   = ''
 
             yield {
                 'MRBTS ID':            rd.get('MRBTS ID', ''),
@@ -582,8 +595,9 @@ def _iter_interfreq_ho_rows(network, lncel_rows):
                 't3 Trigger (dBm)':    t3_dbm,
                 't3a Target (dBm)':    t3a_dbm,
                 'Trigger Gap (dB)':    gap_val,
-                'HO Trigger Mismatch': f'YES ({gap_val} dB)' if mismatch else '',
+                'HO Trigger Mismatch': reason,
                 'Meas Stop Low':       'YES' if stop_low else '',
+                'LNHOIF Dist_Name':    get(r, 'Dist_Name'),
                 '_mismatch':           mismatch,
                 '_stop_low':           stop_low,
             }
