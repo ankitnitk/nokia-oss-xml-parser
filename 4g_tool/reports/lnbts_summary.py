@@ -37,8 +37,9 @@ def _make_formats(wb):
     mixed = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFF2CC'})
     red   = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
     pink  = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFBFCE', 'font_color': '#7B004F'})
+    yellow = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFEB9C', 'font_color': '#9C6500'})
     return dict(hdr=hdr, cell=cell, num=num, dec1=dec1, dec2=dec2,
-                fdd=fdd, tdd=tdd, mixed=mixed, red=red, pink=pink)
+                fdd=fdd, tdd=tdd, mixed=mixed, red=red, pink=pink, yellow=yellow)
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +253,14 @@ def _build_lncel_details(wb, fmt, network, log, rows):
                 else:
                     ws.write_blank(ri, ci, f)
             elif col == 'HO Thr Issue':
-                ws.write(ri, ci, val, fmt['red'] if rd.get('_ho_issue') else fmt['cell'])
+                # red if any relation is "low" (serious); yellow if only "high"
+                if rd.get('_ho_low'):
+                    f = fmt['red']
+                elif rd.get('_ho_issue'):
+                    f = fmt['yellow']
+                else:
+                    f = fmt['cell']
+                ws.write(ri, ci, val, f)
             else:
                 ws.write(ri, ci, val, fmt['cell'])
 
@@ -408,14 +416,17 @@ def _iter_lncel_rows(network):
         # Rule A (per-relation): HO trigger must sit within [t2 - 2, t2].
         #   t3 < t2 - 2  → trigger too far below meas start
         #   t3 > t2      → trigger above meas start (fires before measuring begins)
-        ho_issue_freqs = []
+        ho_low_freqs, ho_high_freqs = [], []
         for r in network.lnhoif_list_by_lncel_dn.get(lncel_k, []):
             tgt    = to_num(get(r, 'eutraCarrierInfo'),    default=None)
             t3_raw = to_num(get(r, 'threshold3InterFreq'), default=None)
-            if (tgt is not None and t3_raw is not None and t2_raw is not None
-                    and (t3_raw < t2_raw - 2 or t3_raw > t2_raw)):
-                ho_issue_freqs.append(int(tgt))
-        ho_issue_freqs = sorted(set(ho_issue_freqs))
+            if tgt is None or t3_raw is None or t2_raw is None:
+                continue
+            if t3_raw < t2_raw - 2:      # trigger too far below meas start (serious)
+                ho_low_freqs.append(int(tgt))
+            elif t3_raw > t2_raw:        # trigger above meas start (likely intentional)
+                ho_high_freqs.append(int(tgt))
+        ho_issue_freqs = sorted(set(ho_low_freqs + ho_high_freqs))
         ho_issue = ('Yes: ' + ', '.join(str(f) for f in ho_issue_freqs)
                     if ho_issue_freqs else '')
 
@@ -471,6 +482,7 @@ def _iter_lncel_rows(network):
             '_capr_missing':   capr_missing,
             '_stop_low':       stop_low,
             '_ho_issue':       bool(ho_issue_freqs),
+            '_ho_low':         bool(ho_low_freqs),
             '_lncel_k':        lncel_k,
             '_t2_raw':         t2_raw,
             '_t2a_raw':        t2a_raw,
@@ -516,24 +528,33 @@ def _build_interfreq_ho_check(wb, fmt, network, log, lncel_rows):
     log(f'  {len(rows):,} frequency relations  —  {n_mismatch:,} trigger mismatches')
 
     for ri, rd in enumerate(rows, 1):
-        row_bad = rd['_mismatch']
+        # Yellow (warning) when the ONLY fault is t3 > t2; red for the serious
+        # "low" case, or when a "high" row also fails Rule B (stop too low).
+        row_yellow = rd['_high'] and not rd['_stop_low']
+        row_red    = rd['_mismatch'] and not row_yellow
         for ci, col in enumerate(_HOCHK_COLS):
             val = rd.get(col, '')
             if col == 'Meas Stop Low':
-                # cell-level flag — red whenever the cell fails Rule B
-                f = fmt['red'] if rd['_stop_low'] else (fmt['red'] if row_bad else fmt['cell'])
+                # cell-level Rule B flag — always red on its own failure
+                f = (fmt['red'] if rd['_stop_low']
+                     else fmt['yellow'] if row_yellow
+                     else fmt['red'] if row_red
+                     else fmt['cell'])
                 ws.write(ri, ci, val, f)
-            elif col == 'HO Trigger Mismatch':
-                ws.write(ri, ci, val, fmt['red'] if row_bad else fmt['cell'])
             elif col in _HOCHK_NUM:
-                base = fmt['red'] if row_bad else fmt['num']
+                base = (fmt['yellow'] if row_yellow
+                        else fmt['red'] if row_red
+                        else fmt['num'])
                 n = to_num(val, default=None)
                 if n is not None:
                     ws.write_number(ri, ci, n, base)
                 else:
                     ws.write_blank(ri, ci, base)
             else:
-                ws.write(ri, ci, val, fmt['red'] if row_bad else fmt['cell'])
+                f = (fmt['yellow'] if row_yellow
+                     else fmt['red'] if row_red
+                     else fmt['cell'])
+                ws.write(ri, ci, val, f)
 
     for ci, col in enumerate(_HOCHK_COLS):
         ws.set_column(ci, ci, _HOCHK_WIDTHS.get(col, 15))
@@ -568,13 +589,14 @@ def _iter_interfreq_ho_rows(network, lncel_rows):
             # Valid window: t2 - 2 <= t3 <= t2.  gap = t2 - t3 (signed):
             #   gap > 2  → trigger sits too far BELOW meas start
             #   gap < 0  → trigger sits ABOVE meas start (t3 > t2)
+            is_high = False
             if t3_raw is not None and t2_raw is not None:
                 gap = t2_raw - t3_raw
                 gap_val = gap
                 if gap > 2:
                     mismatch, reason = True, f'YES (trigger {gap} dB low)'
                 elif gap < 0:
-                    mismatch, reason = True, f'YES (trigger {-gap} dB high)'
+                    mismatch, reason, is_high = True, f'YES (trigger {-gap} dB high)', True
                 else:
                     mismatch, reason = False, ''
             else:
@@ -599,6 +621,7 @@ def _iter_interfreq_ho_rows(network, lncel_rows):
                 'Meas Stop Low':       'YES' if stop_low else '',
                 'LNHOIF Dist_Name':    get(r, 'Dist_Name'),
                 '_mismatch':           mismatch,
+                '_high':               is_high,
                 '_stop_low':           stop_low,
             }
 

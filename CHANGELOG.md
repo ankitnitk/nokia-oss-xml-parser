@@ -17,7 +17,9 @@ Added inter-frequency threshold consistency checks to the 4G LTE summary report 
 
 Presented two ways:
 - **LNCEL Details** sheet — 3 new columns (`t2 Start (dBm)`, `t2a Stop (dBm)`, `HO Thr Issue`); the `t2a Stop` cell turns red on Rule B failure, and `HO Thr Issue` lists the offending target EARFCNs (red) when any relation fails Rule A.
-- **InterFreq HO Check** sheet (new) — one row per cell × LNHOIF frequency relation, with serving/target EARFCN, all four thresholds in dBm, the signed trigger gap, both rule flags (low/high reason text), and the relation's `LNHOIF Dist_Name` for reference; offending rows highlighted red, autofilter on the flag columns for bulk auditing.
+- **InterFreq HO Check** sheet (new) — one row per cell × LNHOIF frequency relation, with serving/target EARFCN, all four thresholds in dBm, the signed trigger gap, both rule flags (low/high reason text), and the relation's `LNHOIF Dist_Name` for reference; autofilter on the flag columns for bulk auditing.
+
+**Severity colouring:** the serious `t3 < t2 − 2` ("trigger N dB low") case is **red**; the `t3 > t2` ("trigger N dB high") case — where the serving HO threshold is merely non-binding and is usually an intentional aggressive/neighbour-driven HO design — is downgraded to **yellow/warning** when it is the *only* fault. A "high" row that also fails Rule B (meas stop too low) stays red. Same red/yellow severity applies to the `HO Thr Issue` flag in LNCEL Details (red if the cell has any "low" relation, yellow if only "high").
 
 Picked up automatically by `DumpWatcher2.py`'s scheduled 4G summary (runs `4g_tool` from source). Rebuild the exe to bundle it into the standalone parser.
 
