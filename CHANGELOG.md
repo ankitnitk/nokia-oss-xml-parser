@@ -2,6 +2,25 @@
 
 ---
 
+## Version 6.3 — June 2026  (`oss_xml_to_xlsx_v6.3.py`)
+
+### Improved — Single-Pass MO Block Slicing (faster parse)
+The parse phase previously made **three full passes** over the decompressed XML before any per-record work:
+1. `_MO_SELF_CLOSE_RE.sub()` — rewrote self-closing `<managedObject/>` tags to paired open+close, **rebuilding the entire multi-GB string** (~13.7 s on a 3.4 GB dump);
+2. `_MO_SPLIT.split()` on `</managedObject>` (~7.4 s);
+3. a filter loop over all ~4.75 M split blocks (~1.9 s).
+
+V6.3 replaces all three with a **single `_MO_FIND_RE.finditer()` scan** over managedObject *open* tags. Each block is sliced as `text[this_open : next_open]`, which:
+- captures a self-closing `<managedObject .../>` as its own complete block with **no string rewrite** (the old self-close data-loss bug, e.g. MAL-10, stays fixed — `[^>]*>` swallows the trailing `/`);
+- **filters by class during the scan**, so only the kept blocks are ever materialised (e.g. 186 k of 4.75 M), instead of allocating every block then discarding.
+
+**Result:** ~2.2× faster block extraction (22 s → 10 s per file on a 3.4 GB dump). End-to-end on a real two-file LTE dump: **parse 76 s → 46 s, total 108 s → 77 s (~29 % faster)**. Output is **byte-identical** to V6.2 (verified: same object counts and same output file size to the byte).
+
+### Includes — 4G InterFreq HO Check
+Bundles the `4g_tool` InterFreq measurement-vs-HO-trigger threshold check (see entry below) into the standalone exe.
+
+---
+
 ## 4G Tool — InterFreq HO Threshold Check — June 2026
 
 ### New — Measurement-vs-HO-trigger threshold validation in 4G Summary

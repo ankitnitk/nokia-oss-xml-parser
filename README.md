@@ -37,7 +37,7 @@ Built and maintained by **Ankit Jain**.
 ### Run from source
 
 ```
-python oss_xml_to_xlsx_v6.2.py
+python oss_xml_to_xlsx_v6.3.py
 ```
 
 A GUI dialog will open to select input files and MO classes. Output is saved as `.xlsx` (or `.xlsb` if selected).
@@ -54,7 +54,7 @@ Requires [PyInstaller](https://pyinstaller.org/):
 
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
-pyinstaller spec/OSS_XML_Parser_V6.2.spec --distpath dist_v62 --workpath build_v62
+pyinstaller spec/OSS_XML_Parser_V6.3.spec --distpath dist_v63 --workpath build_v63
 ```
 
 The compiled exe will appear in `dist_v62/`.
@@ -81,8 +81,9 @@ Requires `psutil` for RAM/CPU metrics (`pip install psutil`).
 
 ```
 nokia-oss-xml-parser/
-├── oss_xml_to_xlsx_v6.2.py   ← current release (V6.2)
-├── oss_xml_to_xlsx_v6.1.py   ← previous release (V6.1)
+├── oss_xml_to_xlsx_v6.3.py   ← current release (V6.3)
+├── oss_xml_to_xlsx_v6.2.py   ← previous release (V6.2)
+├── oss_xml_to_xlsx_v6.1.py
 ├── oss_xml_to_xlsx_v6.0.py
 ├── oss_xml_to_xlsx_v5.1.py   ← stable baseline (V5.1)
 ├── benchmark_v5_v6.py        ← side-by-side benchmark harness
@@ -110,6 +111,7 @@ nokia-oss-xml-parser/
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
+│   ├── OSS_XML_Parser_V6.3.spec
 │   ├── OSS_XML_Parser_V6.2.spec
 │   ├── OSS_XML_Parser_V6.1.2.spec
 │   ├── OSS_XML_Parser_V6.0.spec
@@ -130,7 +132,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.2** | 3G WCDMA summary report (`3g_tool`) integrated into main parser |
+| **V6.3** | Single-pass MO block slicing (~29% faster parse); bundles 4G InterFreq HO Check |
+| V6.2 | 3G WCDMA summary report (`3g_tool`) integrated into main parser |
 | V6.1.2 | Rotated column headers (`textRotation=90`, centred) in all parsed sheets |
 | V6.1 | Sparse record flatten; plain `dict` parser; HW Inventory report (`hw_tool`) |
 | V6.0 | Shared String Table (SST); column-order cache |
