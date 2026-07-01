@@ -428,22 +428,39 @@ def _iter_lncel_rows(network):
         stop_low = (t2a_raw is not None and t2_raw is not None
                     and t2a_raw < t2_raw + 2)
 
-        # Rule A (per-relation): HO trigger must sit within [t2 - 2, t2].
-        #   t3 < t2 - 2  → trigger too far below meas start
-        #   t3 > t2      → trigger above meas start (fires before measuring begins)
-        ho_low_freqs, ho_high_freqs = [], []
+        # Rule A thresholds:
+        #   "low" is a CELL-LEVEL problem: flagged only when EVERY relation has
+        #     t3 < t2 - 2 (HO trigger more than 2 dB below meas START).  A
+        #     single low relation is not an issue — one non-low relation is an
+        #     escape route, so the cell is fine.
+        #   "high": t3 > t2 (trigger above meas START) — per relation, warning.
+        rel_t3        = []      # (tgt, t3_raw) for relations with a known t3
+        n_rel         = 0
+        ho_high_freqs = []
         for r in network.lnhoif_list_by_lncel_dn.get(lncel_k, []):
-            tgt    = to_num(get(r, 'eutraCarrierInfo'),    default=None)
-            t3_raw = to_num(get(r, 'threshold3InterFreq'), default=None)
-            if tgt is None or t3_raw is None or t2_raw is None:
+            tgt = to_num(get(r, 'eutraCarrierInfo'), default=None)
+            if tgt is None:
                 continue
-            if t3_raw < t2_raw - 2:      # trigger too far below meas start (serious)
-                ho_low_freqs.append(int(tgt))
-            elif t3_raw > t2_raw:        # trigger above meas start (likely intentional)
-                ho_high_freqs.append(int(tgt))
-        ho_issue_freqs = sorted(set(ho_low_freqs + ho_high_freqs))
-        ho_issue = ('Yes: ' + ', '.join(str(f) for f in ho_issue_freqs)
-                    if ho_issue_freqs else '')
+            n_rel += 1
+            t3_raw = to_num(get(r, 'threshold3InterFreq'), default=None)
+            if t3_raw is not None:
+                rel_t3.append((int(tgt), t3_raw))
+                if t2_raw is not None and t3_raw > t2_raw:
+                    ho_high_freqs.append(int(tgt))
+        # Cell "all-low": every relation has a known t3 and all sit > 2 dB below
+        # the measurement START threshold (t3 < t2 - 2).
+        cell_all_low = (t2_raw is not None and n_rel > 0
+                        and len(rel_t3) == n_rel
+                        and all(t3 < t2_raw - 2 for _, t3 in rel_t3))
+        ho_low_freqs  = sorted(f for f, _ in rel_t3) if cell_all_low else []
+        ho_high_freqs = sorted(set(ho_high_freqs))
+
+        if cell_all_low:
+            ho_issue = 'All low: ' + ', '.join(str(f) for f in ho_low_freqs)
+        elif ho_high_freqs:
+            ho_issue = 'High: ' + ', '.join(str(f) for f in ho_high_freqs)
+        else:
+            ho_issue = ''
 
         # Build CAPR list as "freq {prio}" sorted by descending sFreqPrio
         capr_freq_prio = {}   # freq → highest prio seen
@@ -496,8 +513,9 @@ def _iter_lncel_rows(network):
             '_lnhoif_missing': lnhoif_missing,
             '_capr_missing':   capr_missing,
             '_stop_low':       stop_low,
-            '_ho_issue':       bool(ho_issue_freqs),
-            '_ho_low':         bool(ho_low_freqs),
+            '_ho_issue':       cell_all_low or bool(ho_high_freqs),
+            '_ho_low':         cell_all_low,
+            '_cell_all_low':   cell_all_low,
             '_lncel_k':        lncel_k,
             '_t2_raw':         t2_raw,
             '_t2a_raw':        t2a_raw,
@@ -544,8 +562,8 @@ def _build_interfreq_ho_check(wb, fmt, network, log, lncel_rows):
 
     for ri, rd in enumerate(rows, 1):
         # Yellow (warning) when the ONLY fault is t3 > t2; red for the serious
-        # "low" case, or when a "high" row also fails Rule B (stop too low).
-        row_yellow = rd['_high'] and not rd['_stop_low']
+        # cell-level "all low" case, or when a "high" row also fails Rule B.
+        row_yellow = (rd['_kind'] == 'high') and not rd['_stop_low']
         row_red    = rd['_mismatch'] and not row_yellow
         for ci, col in enumerate(_HOCHK_COLS):
             val = rd.get(col, '')
@@ -579,10 +597,11 @@ def _build_interfreq_ho_check(wb, fmt, network, log, lncel_rows):
 def _iter_interfreq_ho_rows(network, lncel_rows):
     """Explode each cell into one row per LNHOIF frequency relation."""
     for rd in lncel_rows:
-        lncel_k  = rd.get('_lncel_k', '')
-        t2_raw   = rd.get('_t2_raw')
-        t2a_raw  = rd.get('_t2a_raw')
-        stop_low = rd.get('_stop_low', False)
+        lncel_k      = rd.get('_lncel_k', '')
+        t2_raw       = rd.get('_t2_raw')
+        t2a_raw      = rd.get('_t2a_raw')
+        stop_low     = rd.get('_stop_low', False)
+        cell_all_low = rd.get('_cell_all_low', False)
         t2_dbm   = (t2_raw  - 140) if t2_raw  is not None else ''
         t2a_dbm  = (t2a_raw - 140) if t2a_raw is not None else ''
 
@@ -601,23 +620,19 @@ def _iter_interfreq_ho_rows(network, lncel_rows):
             t3_dbm  = (t3_raw  - 140) if t3_raw  is not None else ''
             t3a_dbm = (t3a_raw - 140) if t3a_raw is not None else ''
 
-            # Valid window: t2 - 2 <= t3 <= t2.  gap = t2 - t3 (signed):
-            #   gap > 2  → trigger sits too far BELOW meas start
-            #   gap < 0  → trigger sits ABOVE meas start (t3 > t2)
-            is_high = False
-            if t3_raw is not None and t2_raw is not None:
-                gap = t2_raw - t3_raw
-                gap_val = gap
-                if gap > 2:
-                    mismatch, reason = True, f'YES (trigger {gap} dB low)'
-                elif gap < 0:
-                    mismatch, reason, is_high = True, f'YES (trigger {-gap} dB high)', True
-                else:
-                    mismatch, reason = False, ''
-            else:
-                gap_val  = ''
-                mismatch = False
-                reason   = ''
+            # "low"  = CELL-level: every relation has t3 < t2 - 2.  Only then is
+            #          this (and every) relation flagged — one non-low relation
+            #          clears the whole cell.
+            # "high" = per relation: t3 > t2 (trigger above meas start).
+            gap_val = (t2_raw - t3_raw) if (t3_raw is not None and t2_raw is not None) else ''
+            kind, reason = '', ''
+            if cell_all_low and t3_raw is not None and t2_raw is not None:
+                kind   = 'low'
+                reason = f'YES (t3 {t2_raw - t3_raw} dB below start)'
+            elif (t3_raw is not None and t2_raw is not None and t3_raw > t2_raw):
+                kind   = 'high'
+                reason = f'YES (t3 {t3_raw - t2_raw} dB above start)'
+            mismatch = bool(kind)
 
             yield {
                 'MRBTS ID':            rd.get('MRBTS ID', ''),
@@ -636,7 +651,7 @@ def _iter_interfreq_ho_rows(network, lncel_rows):
                 'Meas Stop Low':       'YES' if stop_low else '',
                 'LNHOIF Dist_Name':    get(r, 'Dist_Name'),
                 '_mismatch':           mismatch,
-                '_high':               is_high,
+                '_kind':               kind,
                 '_stop_low':           stop_low,
             }
 

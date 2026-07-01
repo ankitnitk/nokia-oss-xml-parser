@@ -2,6 +2,17 @@
 
 ---
 
+## 4G Tool — HO-trigger "low" is now a cell-level check — July 2026
+
+### Changed — "low" HO-trigger mismatch flagged only when ALL relations are low
+Previously a relation was flagged "low" (red) individually whenever `threshold3InterFreq < threshold2InterFreq − 2`. In practice a single low relation isn't a problem — if any other frequency relation is reachable, the cell still has a handover escape route.
+
+Now the "low" flag is **cell-level**: a cell (and all its InterFreq HO Check rows) is flagged red only when **every** relation has `t3 < t2 − 2`. Cells with a mix of low and non-low relations are no longer flagged. The comparison base is `t2` (measurement start, `threshold2InterFreq`), keeping the original 2 dB tolerance. Row reason text reads e.g. `YES (t3 12 dB below start)`; the `HO Thr Issue` column in LNCEL Details shows `All low: <freqs>`. "High" (`t3 > t2`, yellow) is unchanged.
+
+On a live ~31k-cell dump this narrowed the low flag from per-relation noise to **~3,760 genuinely all-low cells (12%)**.
+
+---
+
 ## 4G Tool — LNHOIF thresholds in LNCEL Details — July 2026
 
 ### Improved — `LNHOIF List` column now shows t3 / t3a per relation
