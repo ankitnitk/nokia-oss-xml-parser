@@ -38,8 +38,13 @@ def _make_formats(wb):
     red   = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
     pink  = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFBFCE', 'font_color': '#7B004F'})
     yellow = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFEB9C', 'font_color': '#9C6500'})
+    # wrapped variants for multi-line cells (e.g. per-relation LNHOIF list)
+    wrap     = wb.add_format({'border': 1, 'valign': 'vcenter', 'text_wrap': True})
+    wrap_red = wb.add_format({'border': 1, 'valign': 'vcenter', 'text_wrap': True,
+                              'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
     return dict(hdr=hdr, cell=cell, num=num, dec1=dec1, dec2=dec2,
-                fdd=fdd, tdd=tdd, mixed=mixed, red=red, pink=pink, yellow=yellow)
+                fdd=fdd, tdd=tdd, mixed=mixed, red=red, pink=pink, yellow=yellow,
+                wrap=wrap, wrap_red=wrap_red)
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +159,7 @@ _LNCEL_WIDTHS = {
     'PCI': 7, 'RSI': 7, 'EARFCN DL': 11, 'Ch BW (MHz)': 12,
     'PMAX (dBm)': 11, 'dlRsBoost': 11, 'RS Power (dBm)': 14, 'DL MIMO Mode': 32, 'Array Mode': 28,
     'TAC': 8, 'Tilt': 7, 'Cell Type': 9,
-    'SIB Priority': 12, 'IRFIM {Prio} List': 40, 'LNHOIF List': 40, 'CAPR {Prio} List': 40,
+    'SIB Priority': 12, 'IRFIM {Prio} List': 40, 'LNHOIF List': 26, 'CAPR {Prio} List': 40,
     't2 Start (dBm)': 13, 't2a Stop (dBm)': 13, 'HO Thr Issue': 22,
 }
 
@@ -236,7 +241,7 @@ def _build_lncel_details(wb, fmt, network, log, rows):
             elif col == 'IRFIM {Prio} List':
                 ws.write(ri, ci, val, fmt['red'] if irfim_missing else fmt['cell'])
             elif col == 'LNHOIF List':
-                ws.write(ri, ci, val, fmt['red'] if lnhoif_missing else fmt['cell'])
+                ws.write(ri, ci, val, fmt['wrap_red'] if lnhoif_missing else fmt['wrap'])
             elif col == 'CAPR {Prio} List':
                 ws.write(ri, ci, val, fmt['red'] if capr_missing else fmt['cell'])
             elif col == 't2 Start (dBm)':
@@ -393,13 +398,23 @@ def _iter_lncel_rows(network):
         irfim_freqs   = {f for f, _ in irfim_sorted}
         irfim_missing = bool(required - irfim_freqs)
 
-        lnhoif_freqs = sorted({
-            to_num(get(r, 'eutraCarrierInfo'))
-            for r in network.lnhoif_list_by_lncel_dn.get(lncel_k, [])
-            if get(r, 'eutraCarrierInfo')
-        })
-        lnhoif_list    = ', '.join(str(int(f)) for f in lnhoif_freqs)
-        lnhoif_missing = bool(required - set(lnhoif_freqs))
+        # One line per LNHOIF relation, sorted by target EARFCN, showing the
+        # trigger thresholds in dBm (raw - 140):  "1850: t3 -98 / t3a -112"
+        lnhoif_lines = []
+        lnhoif_seen  = set()
+        for r in sorted(network.lnhoif_list_by_lncel_dn.get(lncel_k, []),
+                        key=lambda x: to_num(get(x, 'eutraCarrierInfo'), default=0)):
+            f = to_num(get(r, 'eutraCarrierInfo'), default=None)
+            if f is None:
+                continue
+            lnhoif_seen.add(f)
+            t3  = to_num(get(r, 'threshold3InterFreq'),  default=None)
+            t3a = to_num(get(r, 'threshold3aInterFreq'), default=None)
+            t3_txt  = f'{t3 - 140}'  if t3  is not None else '?'
+            t3a_txt = f'{t3a - 140}' if t3a is not None else '?'
+            lnhoif_lines.append(f'{int(f)}: t3 {t3_txt} / t3a {t3a_txt}')
+        lnhoif_list    = '\n'.join(lnhoif_lines)
+        lnhoif_missing = bool(required - lnhoif_seen)
 
         # ── Inter-freq measurement vs HO-trigger threshold check ──────────────
         # All four thresholds use the RSRP offset dBm = raw - 140, so raw-value

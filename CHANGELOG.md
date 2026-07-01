@@ -2,6 +2,21 @@
 
 ---
 
+## 4G Tool — LNHOIF thresholds in LNCEL Details — July 2026
+
+### Improved — `LNHOIF List` column now shows t3 / t3a per relation
+The `LNHOIF List` column in the 4G summary's **LNCEL Details** sheet previously listed only the target EARFCNs (`119, 1351, 40990, 41188`). It now shows **one relation per line** with the trigger thresholds in dBm (raw − 140):
+
+```
+119:   t3 -110 / t3a -98
+1351:  t3 -102 / t3a -112
+40990: t3 -104 / t3a -112
+```
+
+`t3` = `LNHOIF.threshold3InterFreq`, `t3a` = `LNHOIF.threshold3aInterFreq` (`?` if absent). The cell uses text-wrap so rows auto-fit; the missing-neighbour red highlight is preserved.
+
+---
+
 ## Version 6.3 — June 2026  (`oss_xml_to_xlsx_v6.3.py`)
 
 ### Improved — Single-Pass MO Block Slicing (faster parse)
