@@ -2,6 +2,29 @@
 
 ---
 
+## Version 6.4 — July 2026  (`oss_xml_to_xlsx_v6.4.py`)
+
+### Improved — Streaming Parse (2× faster parse, 3.6× less RAM)
+V6.3 still materialised the **entire decompressed XML (~3.4 GB per file) as one string** before any parsing began: full gunzip → full decode → scan → pickle blocks to workers. With two files parsed in parallel threads, peak process-tree RSS reached **~14 GB**.
+
+V6.4 replaces this with a **streaming pipeline** (`parse_xml_stream`):
+- The gzip stream is decompressed and scanned in **64 MB chunks**; the full document is never decoded nor held in memory.
+- MO blocks are carved from each chunk **as raw bytes** (same open-tag slicing as V6.3, class filter inline) and batched to worker processes **while decompression continues** — gunzip/scan time overlaps worker parse time instead of preceding it.
+- Workers decode each kept block individually; in-flight batches are bounded, so peak RAM is O(chunk + batches), not O(document).
+- The worker pool is created lazily on the first full batch — small files parse inline with zero process-spawn overhead.
+- ZIP containers fall back to in-memory streams (rare and typically small); `.xml.gz` / `.xml` stream straight from disk.
+
+**Measured on a real two-file LTE dump (173 + 178 MB gz → ~7 GB XML), same machine, same session:**
+
+| | V6.3 | V6.4 |
+|---|---|---|
+| Parse phase | 100 s | **51 s** |
+| Total wall | 148 s | **90 s** |
+| Peak process-tree RSS | 14.4 GB | **4.0 GB** |
+| Output | 165,288,521 B | byte-identical (all data-sheet CRCs equal) |
+
+---
+
 ## 4G Tool — HO-trigger "low" is now a cell-level check — July 2026
 
 ### Changed — "low" HO-trigger mismatch flagged only when ALL relations are low
