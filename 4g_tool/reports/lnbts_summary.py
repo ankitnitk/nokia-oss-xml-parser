@@ -140,7 +140,7 @@ def _iter_lnbts_rows(network):
 # ---------------------------------------------------------------------------
 
 _LNCEL_COLS = [
-    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'LNCEL Name', 'LNCEL ID',
+    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'Cell Name', 'LNCEL ID',
     'Admin State',
     'MCC', 'MNC', 'PCI', 'RSI', 'EARFCN DL', 'Ch BW (MHz)',
     'PMAX (dBm)', 'dlRsBoost', 'RS Power (dBm)', 'DL MIMO Mode', 'Array Mode', 'TAC', 'Tilt',
@@ -154,7 +154,7 @@ _LNCEL_NUM = {
 _LNCEL_DEC1 = {'Ch BW (MHz)', 'PMAX (dBm)', 'RS Power (dBm)', 'Tilt'}
 _LNCEL_DEC2 = {'dlRsBoost'}
 _LNCEL_WIDTHS = {
-    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'LNCEL Name': 22,
+    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'Name': 22, 'Cell Name': 22,
     'LNCEL ID': 9, 'Admin State': 12, 'MCC': 7, 'MNC': 7,
     'PCI': 7, 'RSI': 7, 'EARFCN DL': 11, 'Ch BW (MHz)': 12,
     'PMAX (dBm)': 11, 'dlRsBoost': 11, 'RS Power (dBm)': 14, 'DL MIMO Mode': 32, 'Array Mode': 28,
@@ -334,7 +334,8 @@ def _iter_lncel_rows(network):
         lnbts_name = get(lnbts_rec, 'name')
 
         lncel_rec   = network.lncel_by_dn.get(lncel_k, {})
-        lncel_name  = get(lncel_rec, 'cellName') or get(lncel_rec, 'name')
+        name_val    = get(lncel_rec, 'name')
+        cell_name   = get(lncel_rec, 'cellName')
         admin_state = _admin_state(get(lncel_rec, 'administrativeState'))
         mcc         = get(lncel_rec, 'mcc')
         mnc         = get(lncel_rec, 'mnc')
@@ -485,7 +486,8 @@ def _iter_lncel_rows(network):
             'MRBTS ID':        mrbts,
             'LNBTS ID':        lnbts,
             'LNBTS Name':      lnbts_name,
-            'LNCEL Name':      lncel_name,
+            'Name':            name_val,
+            'Cell Name':       cell_name,
             'LNCEL ID':        lncel_id,
             'Admin State':     admin_state,
             'MCC':             mcc,
@@ -527,7 +529,7 @@ def _iter_lncel_rows(network):
 # ---------------------------------------------------------------------------
 
 _HOCHK_COLS = [
-    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'LNCEL Name', 'LNCEL ID',
+    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'Cell Name', 'LNCEL ID',
     'Serving EARFCN', 't2 Start (dBm)', 't2a Stop (dBm)',
     'Target EARFCN', 't3 Trigger (dBm)', 't3a Target (dBm)',
     'Trigger Gap (dB)', 'HO Trigger Mismatch', 'Meas Stop Low',
@@ -539,7 +541,7 @@ _HOCHK_NUM = {
     't3 Trigger (dBm)', 't3a Target (dBm)', 'Trigger Gap (dB)',
 }
 _HOCHK_WIDTHS = {
-    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'LNCEL Name': 22,
+    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'Name': 22, 'Cell Name': 22,
     'LNCEL ID': 9, 'Serving EARFCN': 14, 't2 Start (dBm)': 13, 't2a Stop (dBm)': 13,
     'Target EARFCN': 13, 't3 Trigger (dBm)': 15, 't3a Target (dBm)': 15,
     'Trigger Gap (dB)': 15, 'HO Trigger Mismatch': 19, 'Meas Stop Low': 14,
@@ -638,7 +640,8 @@ def _iter_interfreq_ho_rows(network, lncel_rows):
                 'MRBTS ID':            rd.get('MRBTS ID', ''),
                 'LNBTS ID':            rd.get('LNBTS ID', ''),
                 'LNBTS Name':          rd.get('LNBTS Name', ''),
-                'LNCEL Name':          rd.get('LNCEL Name', ''),
+                'Name':                rd.get('Name', ''),
+                'Cell Name':           rd.get('Cell Name', ''),
                 'LNCEL ID':            rd.get('LNCEL ID', ''),
                 'Serving EARFCN':      rd.get('EARFCN DL', ''),
                 't2 Start (dBm)':      t2_dbm,
