@@ -2,6 +2,15 @@
 
 ---
 
+## Version 6.5 — August 2026  (`oss_xml_to_xlsx_v6.5.py`)
+
+### Fixed — crash on numeric-looking text values (e.g. hardware serial numbers)
+V6.4 crashed with `OverflowError: cannot convert float infinity to integer` while parsing a real Kenya 4G dump. Root cause: `try_numeric()` (and `parse_dist_name()`) call `float(s)` on every parameter value to detect numerics. Some values are alphanumeric **text** that nonetheless happens to be valid float *syntax* — e.g. a hardware `serialNumber` like `"1834E95902"` parses as mantissa `1834` with exponent `95902`. `float()` doesn't raise on that; it silently overflows to `+inf`. The very next step, `int(f)`, then raises `OverflowError` on infinity — an exception type the surrounding `except (ValueError, TypeError)` never caught, so one bad field crashed the entire worker process and aborted the whole parse.
+
+Both `try_numeric()` and `parse_dist_name()` now check for `inf`/`nan` after the `float()` call and keep the original text in that case, instead of crashing. Verified against the dump that triggered the bug (`4G DUMP_2108.xml.gz`, 62 MB gz / ~858 MB decompressed): parses clean, 123 MB output in ~1m20s.
+
+---
+
 ## Version 6.4 — July 2026  (`oss_xml_to_xlsx_v6.4.py`)
 
 ### Improved — Streaming Parse (2× faster parse, 3.6× less RAM)
