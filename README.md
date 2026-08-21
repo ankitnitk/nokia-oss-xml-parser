@@ -37,7 +37,7 @@ Built and maintained by **Ankit Jain**.
 ### Run from source
 
 ```
-python oss_xml_to_xlsx_v6.4.py
+python oss_xml_to_xlsx_v6.5.py
 ```
 
 A GUI dialog will open to select input files and MO classes. Output is saved as `.xlsx` (or `.xlsb` if selected).
@@ -54,10 +54,10 @@ Requires [PyInstaller](https://pyinstaller.org/):
 
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
-pyinstaller spec/OSS_XML_Parser_V6.4.spec --distpath dist_v64 --workpath build_v64
+pyinstaller spec/OSS_XML_Parser_V6.5.spec --distpath dist_v65 --workpath build_v65
 ```
 
-The compiled exe will appear in `dist_v64/`.
+The compiled exe will appear in `dist_v65/`.
 
 > **Note:** The spec file references `../2g_tool`, `../3g_tool`, `../4g_tool`, and `../hw_tool` relative to its location in `spec/`. Run PyInstaller from the repo root as shown above.
 
@@ -81,7 +81,8 @@ Requires `psutil` for RAM/CPU metrics (`pip install psutil`).
 
 ```
 nokia-oss-xml-parser/
-├── oss_xml_to_xlsx_v6.4.py   ← current release (V6.4)
+├── oss_xml_to_xlsx_v6.5.py   ← current release (V6.5)
+├── oss_xml_to_xlsx_v6.4.py   ← previous release (V6.4)
 ├── oss_xml_to_xlsx_v6.3.py   ← previous release (V6.3)
 ├── oss_xml_to_xlsx_v6.2.py   ← previous release (V6.2)
 ├── oss_xml_to_xlsx_v6.1.py
@@ -112,12 +113,14 @@ nokia-oss-xml-parser/
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
+│   ├── OSS_XML_Parser_V6.5.spec
 │   ├── OSS_XML_Parser_V6.4.spec
 │   ├── OSS_XML_Parser_V6.3.spec
 │   ├── OSS_XML_Parser_V6.2.spec
 │   ├── OSS_XML_Parser_V6.1.2.spec
 │   ├── OSS_XML_Parser_V6.0.spec
 │   ├── OSS_XML_Parser_V5.1.spec
+│   ├── version_info_v65.txt
 │   ├── version_info_v64.txt
 │   ├── version_info_v63.txt
 │   ├── version_info_v62.txt
@@ -136,7 +139,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.4** | Streaming parse — 2× faster parse phase, 3.6× lower peak RAM |
+| **V6.5** | Fixes crash on numeric-looking text values (e.g. serial numbers) overflowing to infinity |
+| V6.4 | Streaming parse — 2× faster parse phase, 3.6× lower peak RAM |
 | V6.3 | Single-pass MO block slicing (~29% faster parse); bundles 4G InterFreq HO Check |
 | V6.2 | 3G WCDMA summary report (`3g_tool`) integrated into main parser |
 | V6.1.2 | Rotated column headers (`textRotation=90`, centred) in all parsed sheets |
