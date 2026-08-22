@@ -7,7 +7,7 @@
 ### Fixed — crash on numeric-looking text values (e.g. hardware serial numbers)
 V6.4 crashed with `OverflowError: cannot convert float infinity to integer` while parsing a real Kenya 4G dump. Root cause: `try_numeric()` (and `parse_dist_name()`) call `float(s)` on every parameter value to detect numerics. Some values are alphanumeric **text** that nonetheless happens to be valid float *syntax* — e.g. a hardware `serialNumber` like `"1834E95902"` parses as mantissa `1834` with exponent `95902`. `float()` doesn't raise on that; it silently overflows to `+inf`. The very next step, `int(f)`, then raises `OverflowError` on infinity — an exception type the surrounding `except (ValueError, TypeError)` never caught, so one bad field crashed the entire worker process and aborted the whole parse.
 
-Both `try_numeric()` and `parse_dist_name()` now check for `inf`/`nan` after the `float()` call and keep the original text in that case, instead of crashing. Verified against the dump that triggered the bug (`4G DUMP_2108.xml.gz`, 62 MB gz / ~858 MB decompressed): parses clean, 123 MB output in ~1m20s.
+Both `try_numeric()` and `parse_dist_name()` now catch `OverflowError` alongside `ValueError`/`TypeError` and keep the original text in that case, instead of crashing. (An earlier fix pre-checked `math.isinf()`/`isnan()` on every value instead — functionally identical, but added a measurable ~15–25% per-call cost to the hot path per microbenchmark; folding the check into the existing `except` clause keeps V6.4's original zero-cost fast path since Python `try` blocks cost nothing unless an exception actually fires.) Verified against the dump that triggered the bug (`4G DUMP_2108.xml.gz`, 62 MB gz / ~858 MB decompressed): parses clean, 123 MB output.
 
 ---
 

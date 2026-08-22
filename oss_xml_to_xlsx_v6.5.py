@@ -10,8 +10,10 @@ Key fix over V6.4:
     like "1834E95902" parses as mantissa 1834 * 10^95902), and float() silently
     overflows those to +/-inf instead of raising. int(inf) then raises
     OverflowError, which was not caught (only ValueError/TypeError were) and
-    crashed the whole parse. Both functions now detect inf/nan results and
-    keep the original text instead of crashing.
+    crashed the whole parse. Both functions now also catch OverflowError and
+    keep the original text instead of crashing — added to the existing except
+    clause, so the non-overflowing fast path keeps V6.4's exact original cost
+    (no extra per-call isinf/isnan check).
 
 Key improvement over V6.3:
   - Streaming parse: the gzip stream is decompressed and scanned in 64 MB
@@ -365,16 +367,15 @@ def try_numeric(text):
         return s
     try:
         f = float(s)
-    except (ValueError, TypeError):
-        return s
+        return int(f) if f == int(f) else f
     # Some fields (e.g. hardware serialNumber like "1834E95902") are alphanumeric
     # text that happens to parse as valid float *syntax* (mantissa "E" exponent),
     # but with an exponent so large float() overflows it to +/-inf. int(inf)
-    # raises OverflowError (not caught above), which crashed V6.4 on real dumps.
-    # Treat non-finite results as non-numeric and keep the original text.
-    if math.isinf(f) or math.isnan(f):
+    # raises OverflowError, which V6.4 didn't catch here, crashing on real dumps.
+    # Caught alongside ValueError/TypeError so the fast (non-overflowing) path
+    # keeps V6.4's original single-try-block cost — no per-call isinf/isnan check.
+    except (ValueError, TypeError, OverflowError):
         return s
-    return int(f) if f == int(f) else f
 
 
 def parse_dist_name(dist_name):
@@ -388,11 +389,8 @@ def parse_dist_name(dist_name):
             continue
         try:
             f = float(oid)
-            if math.isinf(f) or math.isnan(f):
-                h[cls] = oid
-            else:
-                h[cls] = int(f) if f == int(f) else f
-        except ValueError:
+            h[cls] = int(f) if f == int(f) else f
+        except (ValueError, OverflowError):
             h[cls] = oid
     return h
 
