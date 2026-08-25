@@ -11,12 +11,49 @@ Sheets:
 """
 
 import math
+import re
 import xlsxwriter
 from collections import defaultdict
 from network import get, to_num, _lnbts_dn, _lncel_dn
 
 # LTE channel bandwidth (MHz) → number of resource blocks
 _BW_TO_NRB = {1.4: 6, 3.0: 15, 5.0: 25, 10.0: 50, 15.0: 75, 20.0: 100}
+
+# ---------------------------------------------------------------------------
+# Sector-name parsing (LNCEL cellName renaming project)
+# ---------------------------------------------------------------------------
+# Cells are progressively being renamed from the auto-generated sequential
+# form ("SITE_1", "SITE_2", ...) to a sector-encoded form ("SITE_L8_A",
+# "SITE_L26_C1_B", ...) that spells out the LTE band and sector letter, so
+# co-sector cells across bands can be told apart at a glance. "L8"/"L18"/
+# "L21"/"L26" etc. are LTE band numbers, not physical building levels;
+# "_C1"/"_C2" (when present) disambiguates two carriers on the same band.
+# Matched at the END of the string so a site name containing its own
+# underscores (or an accidental double underscore, seen in real data) still
+# splits correctly.
+_SECTOR_RE = re.compile(r'_L(?P<band>\d+)(?:_C(?P<carrier>\d+))?_(?P<sector>[A-Za-z]+\d*)$')
+
+
+def _parse_sector(cell_name):
+    """Parse a renamed cellName into (group_key, band_tag):
+      group_key = (site_prefix, sector_letter) -- cells sharing this key
+                  are the same physical sector (e.g. distinguishes
+                  "SITE_TOWERS" from "SITE_INDOOR" since the literal
+                  prefix text differs).
+      band_tag  = 'L8' / 'L26_C1' etc., for display in audit messages.
+    Returns (None, None) if cell_name doesn't follow the renamed
+    convention yet (still pending)."""
+    if not cell_name:
+        return None, None
+    m = _SECTOR_RE.search(cell_name)
+    if not m:
+        return None, None
+    prefix = cell_name[:m.start()].rstrip('_')
+    if not prefix:
+        return None, None
+    band, carrier, sector = m.group('band'), m.group('carrier'), m.group('sector')
+    band_tag = f'L{band}' + (f'_C{carrier}' if carrier else '')
+    return (prefix, sector), band_tag
 
 
 # ---------------------------------------------------------------------------
@@ -140,27 +177,31 @@ def _iter_lnbts_rows(network):
 # ---------------------------------------------------------------------------
 
 _LNCEL_COLS = [
-    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'LNCEL name', 'LNCEL ID',
+    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'LNCEL name', 'Renamed', 'LNCEL ID',
     'Admin State',
     'MCC', 'MNC', 'PCI', 'RSI', 'EARFCN DL', 'Ch BW (MHz)',
     'PMAX (dBm)', 'dlRsBoost', 'RS Power (dBm)', 'DL MIMO Mode', 'Array Mode', 'TAC', 'Tilt',
     'Cell Type', 'SIB Priority', 'IRFIM {Prio} List', 'LNHOIF List', 'CAPR {Prio} List',
     't2 Start (dBm)', 't2a Stop (dBm)', 'HO Thr Issue',
+    'Number of cells in Sector', 'CA Relation Audit',
 ]
 _LNCEL_NUM = {
     'MRBTS ID', 'LNBTS ID', 'LNCEL ID', 'PCI', 'RSI', 'EARFCN DL', 'SIB Priority',
+    'Number of cells in Sector',
 }
 # TAC is numeric but handled separately for conditional formatting
 _LNCEL_DEC1 = {'Ch BW (MHz)', 'PMAX (dBm)', 'RS Power (dBm)', 'Tilt'}
 _LNCEL_DEC2 = {'dlRsBoost'}
 _LNCEL_WIDTHS = {
     'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'Name': 22, 'LNCEL name': 22,
+    'Renamed': 10,
     'LNCEL ID': 9, 'Admin State': 12, 'MCC': 7, 'MNC': 7,
     'PCI': 7, 'RSI': 7, 'EARFCN DL': 11, 'Ch BW (MHz)': 12,
     'PMAX (dBm)': 11, 'dlRsBoost': 11, 'RS Power (dBm)': 14, 'DL MIMO Mode': 32, 'Array Mode': 28,
     'TAC': 8, 'Tilt': 7, 'Cell Type': 9,
     'SIB Priority': 12, 'IRFIM {Prio} List': 40, 'LNHOIF List': 26, 'CAPR {Prio} List': 40,
     't2 Start (dBm)': 13, 't2a Stop (dBm)': 13, 'HO Thr Issue': 22,
+    'Number of cells in Sector': 14, 'CA Relation Audit': 40,
 }
 
 
@@ -266,6 +307,11 @@ def _build_lncel_details(wb, fmt, network, log, rows):
                 else:
                     f = fmt['cell']
                 ws.write(ri, ci, val, f)
+            elif col == 'Renamed':
+                ws.write(ri, ci, val, fmt['yellow'] if val == 'Pending' else fmt['cell'])
+            elif col == 'CA Relation Audit':
+                f = fmt['wrap_red'] if val.startswith(('Missing', 'Wrong')) else fmt['wrap']
+                ws.write(ri, ci, val, f)
             else:
                 ws.write(ri, ci, val, fmt['cell'])
 
@@ -321,6 +367,54 @@ def _iter_lncel_rows(network):
         to_num(get(x[1], 'LNBTS')),
         to_num(get(x[1], 'LNCEL')),
     ))
+
+    # Pre-pass: group already-renamed cells into physical sectors (same
+    # LNBTS + site prefix + sector letter, e.g. "SITE_L8_A"/"SITE_L18_A"
+    # are one sector) and audit each cell's CAREL relations against its
+    # sector-mates ("strict same-sector mesh": every band pair within a
+    # sector must have a MUTUAL CAREL relation to each other, and only to
+    # each other -- a relation to any cell outside the sector is flagged
+    # "Wrong"). Cells not yet renamed (cellName doesn't match the
+    # convention) get blank results for all three derived columns.
+    sector_groups = defaultdict(list)   # (lnbts_dn, site_prefix, sector) -> [lncel_dn, ...]
+    band_tag_by_dn = {}
+    for cell_type, mode_rec in all_cells:
+        mrbts, lnbts, lncel_id = get(mode_rec, 'MRBTS'), get(mode_rec, 'LNBTS'), get(mode_rec, 'LNCEL')
+        lnbts_k = _lnbts_dn(mrbts, lnbts)
+        lncel_k = _lncel_dn(mrbts, lnbts, lncel_id)
+        cname   = get(network.lncel_by_dn.get(lncel_k, {}), 'cellName')
+        group_key, band_tag = _parse_sector(cname)
+        if group_key is not None:
+            sector_groups[(lnbts_k,) + group_key].append(lncel_k)
+            band_tag_by_dn[lncel_k] = band_tag
+
+    sector_count_by_dn = {}
+    ca_audit_by_dn = {}
+    for members in sector_groups.values():
+        for dn in members:
+            sector_count_by_dn[dn] = len(members)
+        if len(members) < 2:
+            continue   # single band in this sector -- nothing to relate to
+        member_set = set(members)
+        for dn in members:
+            my_targets = network.carel_targets_by_lncel_dn.get(dn, set())
+            missing, wrong = [], []
+            for peer_dn in members:
+                if peer_dn == dn:
+                    continue
+                peer_targets = network.carel_targets_by_lncel_dn.get(peer_dn, set())
+                if not (peer_dn in my_targets and dn in peer_targets):
+                    missing.append(band_tag_by_dn[peer_dn])
+            for t_dn in my_targets:
+                if t_dn not in member_set:
+                    t_rec = network.lncel_by_dn.get(t_dn, {})
+                    wrong.append(get(t_rec, 'cellName') or get(t_rec, 'name') or t_dn.rsplit('/', 1)[-1])
+            parts = []
+            if missing:
+                parts.append('Missing: ' + ', '.join(sorted(set(missing))))
+            if wrong:
+                parts.append('Wrong: -> ' + ', '.join(sorted(set(wrong))))
+            ca_audit_by_dn[dn] = '; '.join(parts) if parts else 'OK'
 
     for cell_type, mode_rec in all_cells:
         mrbts    = get(mode_rec, 'MRBTS')
@@ -488,6 +582,7 @@ def _iter_lncel_rows(network):
             'LNBTS Name':      lnbts_name,
             'Name':            name_val,
             'LNCEL name':      cell_name,
+            'Renamed':         'Yes' if lncel_k in band_tag_by_dn else 'Pending',
             'LNCEL ID':        lncel_id,
             'Admin State':     admin_state,
             'MCC':             mcc,
@@ -511,6 +606,8 @@ def _iter_lncel_rows(network):
             't2 Start (dBm)':  t2_dbm,
             't2a Stop (dBm)':  t2a_dbm,
             'HO Thr Issue':    ho_issue,
+            'Number of cells in Sector': sector_count_by_dn.get(lncel_k, ''),
+            'CA Relation Audit': ca_audit_by_dn.get(lncel_k, ''),
             '_irfim_missing':  irfim_missing,
             '_lnhoif_missing': lnhoif_missing,
             '_capr_missing':   capr_missing,

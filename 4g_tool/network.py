@@ -71,7 +71,7 @@ class Network:
     NEEDED_SHEETS = [
         'LNBTS', 'LNBTS_FDD', 'LNBTS_TDD',
         'LNCEL', 'LNCEL_FDD', 'LNCEL_TDD',
-        'IRFIM', 'LNHOIF', 'SIB', 'REDRT', 'CAPR',
+        'IRFIM', 'LNHOIF', 'SIB', 'REDRT', 'CAPR', 'CAREL',
     ]
 
     def __init__(self, sheets):
@@ -169,6 +169,19 @@ class Network:
             if k:
                 self.capr_list_by_lncel_dn[k].append(r)
 
+        # ---- CAREL (carrier-aggregation SCell relations) -------------------
+        # lcrId is the target LNCEL's ID *within the same LNBTS* as the
+        # relation's own LNCEL -- resolve directly to the target's full
+        # LNCEL Dist_Name so callers never need to redo that lookup.
+        self.carel_targets_by_lncel_dn = defaultdict(set)
+        for r in sheets.get('CAREL', []):
+            k = _key_lncel(r)
+            mrbts  = get(r, 'MRBTS')
+            lnbts  = get(r, 'LNBTS')
+            lcr_id = get(r, 'lcrId')
+            if k and mrbts and lnbts and lcr_id != '':
+                self.carel_targets_by_lncel_dn[k].add(_lncel_dn(mrbts, lnbts, lcr_id))
+
     # -----------------------------------------------------------------------
     # Convenience accessors
     # -----------------------------------------------------------------------
@@ -248,6 +261,7 @@ _DN_PATTERNS = {
     'SIB':       lambda r: f"PLMN-PLMN/MRBTS-{get(r,'MRBTS')}/LNBTS-{get(r,'LNBTS')}/LNCEL-{get(r,'LNCEL')}/SIB-{get(r,'SIB')}",
     'REDRT':     lambda r: f"PLMN-PLMN/MRBTS-{get(r,'MRBTS')}/LNBTS-{get(r,'LNBTS')}/LNCEL-{get(r,'LNCEL')}/REDRT-{get(r,'REDRT')}",
     'CAPR':      lambda r: f"PLMN-PLMN/MRBTS-{get(r,'MRBTS')}/LNBTS-{get(r,'LNBTS')}/LNCEL-{get(r,'LNCEL')}/CAPR-{get(r,'CAPR')}",
+    'CAREL':     lambda r: f"PLMN-PLMN/MRBTS-{get(r,'MRBTS')}/LNBTS-{get(r,'LNBTS')}/LNCEL-{get(r,'LNCEL')}/CAREL-{get(r,'CAREL')}",
 }
 
 
