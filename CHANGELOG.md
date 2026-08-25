@@ -2,6 +2,13 @@
 
 ---
 
+## 4G Tool — CAREL Correction: fix nonsensical same-band proposals — August 2026
+
+### Fixed — duplicate cellName produced a self-referential "Create" row
+Two cells can end up with the identical sector-encoded `cellName` (a real data bug — found `NAIROBI_ARCHIVES_L8_A` assigned to both LNCEL 1 and LNCEL 10, the latter an indoor/IBS cell apparently mis-named after its co-sited outdoor cell). The grouping logic treated both as legitimate sector-mates and proposed a nonsensical CAREL relation between them (band L8_A relating to itself).
+
+CA relations are inherently cross-band — two cells sharing the same band_tag within a "sector" are never a legitimate Missing/Create/Wrong pair between each other, regardless of direction. Fixed in both the LNCEL Details audit and the CAREL Correction sheet: same-band_tag pairs are excluded from Missing/Create, and any *existing* same-band relation is now also caught as Wrong/Delete. Instead, the LNCEL Details `CA Relation Audit` column now reports `Duplicate cellName: -> <cell>` so the actual naming problem stays visible rather than silently disappearing. On the real dump this removed 18 bogus `Create` rows (437 → 419).
+
 ## 4G Tool — CAREL Correction sheet — August 2026
 
 ### Added — new "CAREL Correction" sheet: concrete delete/create action list
