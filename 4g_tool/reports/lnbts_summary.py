@@ -140,7 +140,7 @@ def _iter_lnbts_rows(network):
 # ---------------------------------------------------------------------------
 
 _LNCEL_COLS = [
-    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'Cell Name', 'LNCEL ID',
+    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'LNCEL name', 'LNCEL ID',
     'Admin State',
     'MCC', 'MNC', 'PCI', 'RSI', 'EARFCN DL', 'Ch BW (MHz)',
     'PMAX (dBm)', 'dlRsBoost', 'RS Power (dBm)', 'DL MIMO Mode', 'Array Mode', 'TAC', 'Tilt',
@@ -154,7 +154,7 @@ _LNCEL_NUM = {
 _LNCEL_DEC1 = {'Ch BW (MHz)', 'PMAX (dBm)', 'RS Power (dBm)', 'Tilt'}
 _LNCEL_DEC2 = {'dlRsBoost'}
 _LNCEL_WIDTHS = {
-    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'Name': 22, 'Cell Name': 22,
+    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'Name': 22, 'LNCEL name': 22,
     'LNCEL ID': 9, 'Admin State': 12, 'MCC': 7, 'MNC': 7,
     'PCI': 7, 'RSI': 7, 'EARFCN DL': 11, 'Ch BW (MHz)': 12,
     'PMAX (dBm)': 11, 'dlRsBoost': 11, 'RS Power (dBm)': 14, 'DL MIMO Mode': 32, 'Array Mode': 28,
@@ -487,7 +487,7 @@ def _iter_lncel_rows(network):
             'LNBTS ID':        lnbts,
             'LNBTS Name':      lnbts_name,
             'Name':            name_val,
-            'Cell Name':       cell_name,
+            'LNCEL name':      cell_name,
             'LNCEL ID':        lncel_id,
             'Admin State':     admin_state,
             'MCC':             mcc,
@@ -641,7 +641,7 @@ def _iter_interfreq_ho_rows(network, lncel_rows):
                 'LNBTS ID':            rd.get('LNBTS ID', ''),
                 'LNBTS Name':          rd.get('LNBTS Name', ''),
                 'Name':                rd.get('Name', ''),
-                'Cell Name':           rd.get('Cell Name', ''),
+                'Cell Name':           rd.get('LNCEL name', ''),
                 'LNCEL ID':            rd.get('LNCEL ID', ''),
                 'Serving EARFCN':      rd.get('EARFCN DL', ''),
                 't2 Start (dBm)':      t2_dbm,
