@@ -56,6 +56,27 @@ def _parse_sector(cell_name):
     return (prefix, sector), band_tag
 
 
+def _group_cells_by_sector(network, all_cells):
+    """Group (cell_type, mode_rec) pairs -- as gathered in _iter_lncel_rows --
+    into physical sectors via _parse_sector. Returns (sector_groups,
+    band_tag_by_dn):
+      sector_groups:  {(lnbts_dn, site_prefix, sector): [lncel_dn, ...]}
+      band_tag_by_dn: {lncel_dn: 'L8' / 'L26_C1' ...}  (renamed cells only)
+    """
+    sector_groups = defaultdict(list)
+    band_tag_by_dn = {}
+    for cell_type, mode_rec in all_cells:
+        mrbts, lnbts, lncel_id = get(mode_rec, 'MRBTS'), get(mode_rec, 'LNBTS'), get(mode_rec, 'LNCEL')
+        lnbts_k = _lnbts_dn(mrbts, lnbts)
+        lncel_k = _lncel_dn(mrbts, lnbts, lncel_id)
+        cname   = get(network.lncel_by_dn.get(lncel_k, {}), 'cellName')
+        group_key, band_tag = _parse_sector(cname)
+        if group_key is not None:
+            sector_groups[(lnbts_k,) + group_key].append(lncel_k)
+            band_tag_by_dn[lncel_k] = band_tag
+    return sector_groups, band_tag_by_dn
+
+
 # ---------------------------------------------------------------------------
 # Shared format factory
 # ---------------------------------------------------------------------------
@@ -102,6 +123,7 @@ def build(network, output_path, progress_fn=None):
     _build_lncel_details(wb, fmt, network, log, lncel_rows)
     _build_interfreq_ho_check(wb, fmt, network, log, lncel_rows)
     _build_network_stats(wb, fmt, network, log, lncel_rows)
+    _build_carel_correction(wb, fmt, network, log)
 
     wb.close()
     log(f'Workbook saved: {output_path}')
@@ -177,7 +199,7 @@ def _iter_lnbts_rows(network):
 # ---------------------------------------------------------------------------
 
 _LNCEL_COLS = [
-    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'LNCEL name', 'Renamed', 'LNCEL ID',
+    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'LNCEL name', 'Sector ID', 'LNCEL ID',
     'Admin State',
     'MCC', 'MNC', 'PCI', 'RSI', 'EARFCN DL', 'Ch BW (MHz)',
     'PMAX (dBm)', 'dlRsBoost', 'RS Power (dBm)', 'DL MIMO Mode', 'Array Mode', 'TAC', 'Tilt',
@@ -194,7 +216,7 @@ _LNCEL_DEC1 = {'Ch BW (MHz)', 'PMAX (dBm)', 'RS Power (dBm)', 'Tilt'}
 _LNCEL_DEC2 = {'dlRsBoost'}
 _LNCEL_WIDTHS = {
     'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'Name': 22, 'LNCEL name': 22,
-    'Renamed': 10,
+    'Sector ID': 10,
     'LNCEL ID': 9, 'Admin State': 12, 'MCC': 7, 'MNC': 7,
     'PCI': 7, 'RSI': 7, 'EARFCN DL': 11, 'Ch BW (MHz)': 12,
     'PMAX (dBm)': 11, 'dlRsBoost': 11, 'RS Power (dBm)': 14, 'DL MIMO Mode': 32, 'Array Mode': 28,
@@ -307,8 +329,6 @@ def _build_lncel_details(wb, fmt, network, log, rows):
                 else:
                     f = fmt['cell']
                 ws.write(ri, ci, val, f)
-            elif col == 'Renamed':
-                ws.write(ri, ci, val, fmt['yellow'] if val == 'Pending' else fmt['cell'])
             elif col == 'CA Relation Audit':
                 f = fmt['wrap_red'] if val.startswith(('Missing', 'Wrong')) else fmt['wrap']
                 ws.write(ri, ci, val, f)
@@ -352,8 +372,10 @@ def _admin_state(val):
     return val
 
 
-def _iter_lncel_rows(network):
-    # Gather all cells from both FDD and TDD, sort by (MRBTS, LNBTS, LNCEL)
+def _gather_all_cells(network):
+    """All LNCEL_FDD + LNCEL_TDD (cell_type, mode_rec) pairs, sorted by
+    (MRBTS, LNBTS, LNCEL). Shared by _iter_lncel_rows and
+    _build_carel_correction."""
     all_cells = []
     for recs in network.lncel_fdd_list_by_lnbts_dn.values():
         for r in recs:
@@ -367,32 +389,26 @@ def _iter_lncel_rows(network):
         to_num(get(x[1], 'LNBTS')),
         to_num(get(x[1], 'LNCEL')),
     ))
+    return all_cells
 
-    # Pre-pass: group already-renamed cells into physical sectors (same
-    # LNBTS + site prefix + sector letter, e.g. "SITE_L8_A"/"SITE_L18_A"
-    # are one sector) and audit each cell's CAREL relations against its
-    # sector-mates ("strict same-sector mesh": every band pair within a
-    # sector must have a MUTUAL CAREL relation to each other, and only to
-    # each other -- a relation to any cell outside the sector is flagged
-    # "Wrong"). Cells not yet renamed (cellName doesn't match the
-    # convention) get blank results for all three derived columns.
-    sector_groups = defaultdict(list)   # (lnbts_dn, site_prefix, sector) -> [lncel_dn, ...]
-    band_tag_by_dn = {}
-    for cell_type, mode_rec in all_cells:
-        mrbts, lnbts, lncel_id = get(mode_rec, 'MRBTS'), get(mode_rec, 'LNBTS'), get(mode_rec, 'LNCEL')
-        lnbts_k = _lnbts_dn(mrbts, lnbts)
-        lncel_k = _lncel_dn(mrbts, lnbts, lncel_id)
-        cname   = get(network.lncel_by_dn.get(lncel_k, {}), 'cellName')
-        group_key, band_tag = _parse_sector(cname)
-        if group_key is not None:
-            sector_groups[(lnbts_k,) + group_key].append(lncel_k)
-            band_tag_by_dn[lncel_k] = band_tag
+
+def _iter_lncel_rows(network):
+    all_cells = _gather_all_cells(network)
+
+    # Group already-renamed cells into physical sectors and audit each
+    # cell's CAREL relations against its sector-mates. Shared with the
+    # CAREL Correction sheet (_build_carel_correction), which needs the
+    # same grouping to propose fixes.
+    sector_groups, band_tag_by_dn = _group_cells_by_sector(network, all_cells)
 
     sector_count_by_dn = {}
+    sector_letter_by_dn = {}
     ca_audit_by_dn = {}
-    for members in sector_groups.values():
+    for group_key, members in sector_groups.items():
+        sector_letter = group_key[-1]   # (lnbts_dn, site_prefix, sector) -> sector
         for dn in members:
             sector_count_by_dn[dn] = len(members)
+            sector_letter_by_dn[dn] = sector_letter
         if len(members) < 2:
             continue   # single band in this sector -- nothing to relate to
         member_set = set(members)
@@ -582,7 +598,7 @@ def _iter_lncel_rows(network):
             'LNBTS Name':      lnbts_name,
             'Name':            name_val,
             'LNCEL name':      cell_name,
-            'Renamed':         'Yes' if lncel_k in band_tag_by_dn else 'Pending',
+            'Sector ID':       sector_letter_by_dn.get(lncel_k, ''),
             'LNCEL ID':        lncel_id,
             'Admin State':     admin_state,
             'MCC':             mcc,
@@ -856,3 +872,120 @@ def _compute_stats(network, lncel_rows):
 def _w(n):
     """Passthrough — just for readability."""
     return n
+
+
+# ---------------------------------------------------------------------------
+# Sheet 5 — CAREL Correction
+# ---------------------------------------------------------------------------
+# Turns the "CA Relation Audit" findings (LNCEL Details) into a concrete
+# action list: one row per CAREL relation that should be deleted (points
+# outside its cell's sector) or created (a same-sector band pair with no
+# mutual relation yet). Only covers cells whose cellName is already
+# renamed to the sector-encoded convention -- there's no sector to check
+# an un-renamed cell against.
+
+_CORR_COLS = [
+    'MRBTS', 'LNBTS', 'LNCEL', 'CAREL', 'cellName',
+    'Target lcrId', 'Target lnBtsId', 'Target cellName',
+    'Remarks',
+]
+_CORR_NUM = {'MRBTS', 'LNBTS', 'LNCEL', 'CAREL', 'Target lcrId', 'Target lnBtsId'}
+_CORR_WIDTHS = {
+    'MRBTS': 12, 'LNBTS': 12, 'LNCEL': 9, 'CAREL': 9, 'cellName': 26,
+    'Target lcrId': 13, 'Target lnBtsId': 13, 'Target cellName': 26,
+    'Remarks': 10,
+}
+
+
+def _build_carel_correction(wb, fmt, network, log):
+    log('Building CAREL Correction sheet...')
+    ws = wb.add_worksheet('CAREL Correction')
+    ws.freeze_panes(1, 0)
+
+    all_cells = _gather_all_cells(network)
+    sector_groups, band_tag_by_dn = _group_cells_by_sector(network, all_cells)
+
+    rows = []
+    for members in sector_groups.values():
+        if len(members) < 2:
+            continue   # single band in this sector -- nothing to relate to
+        member_set = set(members)
+
+        # -- Delete candidates: existing relations pointing outside the sector --
+        for dn in members:
+            src_rec = network.lncel_by_dn.get(dn, {})
+            for rec in network.carel_list_by_lncel_dn.get(dn, []):
+                lcr_id = get(rec, 'lcrId')
+                if lcr_id == '':
+                    continue
+                lnbts_t   = get(rec, 'lnBtsId')
+                target_dn = _lncel_dn(get(rec, 'MRBTS'), lnbts_t, lcr_id)
+                if target_dn in member_set:
+                    continue
+                tgt_rec = network.lncel_by_dn.get(target_dn, {})
+                rows.append({
+                    'MRBTS': get(rec, 'MRBTS'), 'LNBTS': get(rec, 'LNBTS'),
+                    'LNCEL': get(rec, 'LNCEL'), 'CAREL': get(rec, 'CAREL'),
+                    'cellName': get(src_rec, 'cellName'),
+                    'Target lcrId': lcr_id, 'Target lnBtsId': lnbts_t,
+                    'Target cellName': get(tgt_rec, 'cellName') or get(tgt_rec, 'name'),
+                    'Remarks': 'Delete',
+                    '_sort': (to_num(get(rec, 'MRBTS')), to_num(get(rec, 'LNBTS')),
+                              to_num(get(rec, 'LNCEL')), 0, to_num(get(rec, 'CAREL'))),
+                })
+
+        # -- Create candidates: same-sector directed pairs with no relation yet --
+        # Next CAREL id per source cell starts above the highest id CURRENTLY
+        # in use (including ids being deleted above) -- never reused, per
+        # spec -- and increments for each further creation on that same cell.
+        next_id_by_dn = {}
+        for dn in members:
+            existing = [to_num(get(r, 'CAREL')) for r in network.carel_list_by_lncel_dn.get(dn, [])]
+            next_id_by_dn[dn] = (max(existing) + 1) if existing else 1
+
+        for i in members:
+            i_targets = network.carel_targets_by_lncel_dn.get(i, set())
+            src_rec   = network.lncel_by_dn.get(i, {})
+            for j in members:
+                if i == j or j in i_targets:
+                    continue
+                tgt_rec = network.lncel_by_dn.get(j, {})
+                new_id  = next_id_by_dn[i]
+                next_id_by_dn[i] += 1
+                rows.append({
+                    'MRBTS': get(src_rec, 'MRBTS'), 'LNBTS': get(src_rec, 'LNBTS'),
+                    'LNCEL': get(src_rec, 'LNCEL'), 'CAREL': new_id,
+                    'cellName': get(src_rec, 'cellName'),
+                    'Target lcrId': get(tgt_rec, 'LNCEL'), 'Target lnBtsId': get(tgt_rec, 'LNBTS'),
+                    'Target cellName': get(tgt_rec, 'cellName'),
+                    'Remarks': 'Create',
+                    '_sort': (to_num(get(src_rec, 'MRBTS')), to_num(get(src_rec, 'LNBTS')),
+                              to_num(get(src_rec, 'LNCEL')), 1, to_num(new_id)),
+                })
+
+    rows.sort(key=lambda r: r['_sort'])
+    log(f'  {len(rows):,} correction rows '
+        f'({sum(1 for r in rows if r["Remarks"] == "Delete"):,} delete, '
+        f'{sum(1 for r in rows if r["Remarks"] == "Create"):,} create)')
+
+    for ci, col in enumerate(_CORR_COLS):
+        ws.write(0, ci, col, fmt['hdr'])
+    ws.set_row(0, 30)
+
+    for ri, rd in enumerate(rows, 1):
+        row_fmt = fmt['red'] if rd['Remarks'] == 'Delete' else fmt['fdd']
+        for ci, col in enumerate(_CORR_COLS):
+            val = rd.get(col, '')
+            if col in _CORR_NUM:
+                n = to_num(val, default=None)
+                if n is not None:
+                    ws.write_number(ri, ci, n, row_fmt)
+                else:
+                    ws.write_blank(ri, ci, row_fmt)
+            else:
+                ws.write(ri, ci, val, row_fmt)
+
+    for ci, col in enumerate(_CORR_COLS):
+        ws.set_column(ci, ci, _CORR_WIDTHS.get(col, 15))
+    if rows:
+        ws.autofilter(0, 0, len(rows), len(_CORR_COLS) - 1)

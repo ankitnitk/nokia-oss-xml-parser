@@ -171,16 +171,22 @@ class Network:
 
         # ---- CAREL (carrier-aggregation SCell relations) -------------------
         # lcrId is the target LNCEL's ID *within the same LNBTS* as the
-        # relation's own LNCEL -- resolve directly to the target's full
-        # LNCEL Dist_Name so callers never need to redo that lookup.
-        self.carel_targets_by_lncel_dn = defaultdict(set)
+        # relation's own LNCEL. Keep both: the raw per-relation records
+        # (needed to know each relation's own CAREL instance id, for the
+        # CAREL Correction sheet) and a derived target-DN set (fast
+        # membership checks for the CA Relation Audit column).
+        self.carel_list_by_lncel_dn = defaultdict(list)
         for r in sheets.get('CAREL', []):
             k = _key_lncel(r)
-            mrbts  = get(r, 'MRBTS')
-            lnbts  = get(r, 'LNBTS')
-            lcr_id = get(r, 'lcrId')
-            if k and mrbts and lnbts and lcr_id != '':
-                self.carel_targets_by_lncel_dn[k].add(_lncel_dn(mrbts, lnbts, lcr_id))
+            if k:
+                self.carel_list_by_lncel_dn[k].append(r)
+
+        self.carel_targets_by_lncel_dn = defaultdict(set)
+        for lncel_dn, recs in self.carel_list_by_lncel_dn.items():
+            for r in recs:
+                mrbts, lnbts, lcr_id = get(r, 'MRBTS'), get(r, 'LNBTS'), get(r, 'lcrId')
+                if mrbts and lnbts and lcr_id != '':
+                    self.carel_targets_by_lncel_dn[lncel_dn].add(_lncel_dn(mrbts, lnbts, lcr_id))
 
     # -----------------------------------------------------------------------
     # Convenience accessors
