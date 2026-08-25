@@ -412,20 +412,35 @@ def _iter_lncel_rows(network):
         if len(members) < 2:
             continue   # single band in this sector -- nothing to relate to
         member_set = set(members)
+        # Two cells can end up with the identical cellName (a real naming
+        # bug, e.g. an indoor cell mistakenly given the same sector-encoded
+        # name as its co-sited outdoor cell) -- CA relations only make
+        # sense between DIFFERENT bands, so same-band_tag pairs are never
+        # "missing" a relation to each other; flag them as a duplicate
+        # instead of proposing a nonsensical self-referential relation.
         for dn in members:
             my_targets = network.carel_targets_by_lncel_dn.get(dn, set())
-            missing, wrong = [], []
+            my_band    = band_tag_by_dn[dn]
+            missing, wrong, dupes = [], [], []
             for peer_dn in members:
                 if peer_dn == dn:
+                    continue
+                if band_tag_by_dn[peer_dn] == my_band:
+                    t_rec = network.lncel_by_dn.get(peer_dn, {})
+                    dupes.append(get(t_rec, 'cellName') or get(t_rec, 'name') or peer_dn.rsplit('/', 1)[-1])
                     continue
                 peer_targets = network.carel_targets_by_lncel_dn.get(peer_dn, set())
                 if not (peer_dn in my_targets and dn in peer_targets):
                     missing.append(band_tag_by_dn[peer_dn])
             for t_dn in my_targets:
-                if t_dn not in member_set:
+                # Wrong if it points outside the sector, OR at a same-band
+                # duplicate within it (CA relations are cross-band only).
+                if t_dn not in member_set or band_tag_by_dn.get(t_dn) == my_band:
                     t_rec = network.lncel_by_dn.get(t_dn, {})
                     wrong.append(get(t_rec, 'cellName') or get(t_rec, 'name') or t_dn.rsplit('/', 1)[-1])
             parts = []
+            if dupes:
+                parts.append('Duplicate cellName: -> ' + ', '.join(sorted(set(dupes))))
             if missing:
                 parts.append('Missing: ' + ', '.join(sorted(set(missing))))
             if wrong:
@@ -911,16 +926,18 @@ def _build_carel_correction(wb, fmt, network, log):
             continue   # single band in this sector -- nothing to relate to
         member_set = set(members)
 
-        # -- Delete candidates: existing relations pointing outside the sector --
+        # -- Delete candidates: relations pointing outside the sector, or at
+        #    a same-band duplicate within it (CA is cross-band only) --
         for dn in members:
             src_rec = network.lncel_by_dn.get(dn, {})
+            my_band = band_tag_by_dn[dn]
             for rec in network.carel_list_by_lncel_dn.get(dn, []):
                 lcr_id = get(rec, 'lcrId')
                 if lcr_id == '':
                     continue
                 lnbts_t   = get(rec, 'lnBtsId')
                 target_dn = _lncel_dn(get(rec, 'MRBTS'), lnbts_t, lcr_id)
-                if target_dn in member_set:
+                if target_dn in member_set and band_tag_by_dn.get(target_dn) != my_band:
                     continue
                 tgt_rec = network.lncel_by_dn.get(target_dn, {})
                 rows.append({
@@ -947,7 +964,11 @@ def _build_carel_correction(wb, fmt, network, log):
             i_targets = network.carel_targets_by_lncel_dn.get(i, set())
             src_rec   = network.lncel_by_dn.get(i, {})
             for j in members:
-                if i == j or j in i_targets:
+                # Skip self, already-related, and same-band_tag pairs --
+                # two cells sharing a band (a duplicate-cellName data bug,
+                # see LNCEL Details' "Duplicate cellName" audit note) don't
+                # need a CA relation to each other; CA is cross-band only.
+                if i == j or j in i_targets or band_tag_by_dn[j] == band_tag_by_dn[i]:
                     continue
                 tgt_rec = network.lncel_by_dn.get(j, {})
                 new_id  = next_id_by_dn[i]
