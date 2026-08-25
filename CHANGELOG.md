@@ -2,6 +2,19 @@
 
 ---
 
+## 4G Tool — Sector CA-relation audit — August 2026
+
+### Added — "Number of cells in Sector" and "CA Relation Audit" columns in LNCEL Details
+Cells are progressively being renamed on the network from the auto-generated sequential `cellName` ("SITE_1", "SITE_2", ...) to a sector-encoded form ("SITE_L8_A", "SITE_L26_C1_B", ...) that spells out the LTE band and sector letter. The LNCEL Details sheet now surfaces this migration:
+
+- **`Renamed`** — `Yes` if a cell's `cellName` already follows the sector-encoded convention, `Pending` if it's still the old auto-generated form.
+- **`Number of cells in Sector`** — for renamed cells, how many other cells (across bands) share the same site + sector letter (e.g. `SITE_L8_A` + `SITE_L18_A` are both sector A → count 2). Indoor/outdoor and other differently-prefixed deployments at the "same" site are correctly kept separate since the literal site-name prefix differs (`SITE_TOWERS` vs `SITE_INDOOR`). Blank for cells still pending rename.
+- **`CA Relation Audit`** — reads the new `CAREL` MO (carrier-aggregation SCell relations, `lcrId` = target LNCEL ID within the same LNBTS) and validates a strict same-sector mesh: every pair of bands within a sector must have a **mutual** CAREL relation to each other, and *only* to each other. Reports `OK`, `Missing: <bands>` (a same-sector pair with no relation, or only one-directional), `Wrong: -> <cells>` (a relation pointing outside the sector), or both. Blank for cells pending rename, since there's no sector to check against yet.
+
+`4g_tool/network.py` now also loads the `CAREL` sheet (already included in the parser's 4G class filter, no dump re-export needed) and resolves each relation's `lcrId` directly to the target LNCEL's Dist_Name.
+
+---
+
 ## Version 6.5 — August 2026  (`oss_xml_to_xlsx_v6.5.py`)
 
 ### Fixed — crash on numeric-looking text values (e.g. hardware serial numbers)
