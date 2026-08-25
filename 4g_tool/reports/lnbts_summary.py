@@ -263,6 +263,7 @@ def _build_lncel_details(wb, fmt, network, log, rows):
         lnhoif_missing = rd.get('_lnhoif_missing', False)
         capr_missing   = rd.get('_capr_missing', False)
         tac_red        = rd.get('LNBTS ID', '') in inconsistent_tac_lnbts
+        dup_cellname   = rd.get('_dup_cellname', False)
 
         mrbts_id = rd.get('MRBTS ID', '')
         for ci, col in enumerate(_LNCEL_COLS):
@@ -301,6 +302,8 @@ def _build_lncel_details(wb, fmt, network, log, rows):
                     ws.write_number(ri, ci, n, f)
                 else:
                     ws.write_blank(ri, ci, f)
+            elif col == 'LNCEL name':
+                ws.write(ri, ci, val, fmt['red'] if dup_cellname else fmt['cell'])
             elif col == 'IRFIM {Prio} List':
                 ws.write(ri, ci, val, fmt['red'] if irfim_missing else fmt['cell'])
             elif col == 'LNHOIF List':
@@ -404,6 +407,7 @@ def _iter_lncel_rows(network):
     sector_count_by_dn = {}
     sector_letter_by_dn = {}
     ca_audit_by_dn = {}
+    dup_name_dns = set()   # lncel_dn -> shares its cellName with a sector-mate
     for group_key, members in sector_groups.items():
         sector_letter = group_key[-1]   # (lnbts_dn, site_prefix, sector) -> sector
         for dn in members:
@@ -440,6 +444,7 @@ def _iter_lncel_rows(network):
                     wrong.append(get(t_rec, 'cellName') or get(t_rec, 'name') or t_dn.rsplit('/', 1)[-1])
             parts = []
             if dupes:
+                dup_name_dns.add(dn)
                 parts.append('Duplicate cellName: -> ' + ', '.join(sorted(set(dupes))))
             if missing:
                 parts.append('Missing: ' + ', '.join(sorted(set(missing))))
@@ -647,6 +652,7 @@ def _iter_lncel_rows(network):
             '_ho_low':         cell_all_low,
             '_cell_all_low':   cell_all_low,
             '_lncel_k':        lncel_k,
+            '_dup_cellname':   lncel_k in dup_name_dns,
             '_t2_raw':         t2_raw,
             '_t2a_raw':        t2a_raw,
         }

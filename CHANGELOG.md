@@ -2,6 +2,11 @@
 
 ---
 
+## 4G Tool — highlight duplicate cellName in LNCEL Details — August 2026
+
+### Added — red highlight on duplicate `LNCEL name` cells
+Cells sharing an identical sector-encoded `cellName` with another cell in the same sector (see previous entry) now also get their `LNCEL name` cell highlighted red directly in the LNCEL Details sheet, not just flagged in the `CA Relation Audit` text — makes the underlying naming problem visible without needing to read the audit column.
+
 ## 4G Tool — CAREL Correction: fix nonsensical same-band proposals — August 2026
 
 ### Fixed — duplicate cellName produced a self-referential "Create" row
