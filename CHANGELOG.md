@@ -2,6 +2,11 @@
 
 ---
 
+## Version 6.5.1 — August 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
+
+### Rebuilt exe to bundle the updated `4g_tool`
+No changes to the core parser script — same pattern as V6.1.2 (a same-script exe rebuild for a bundled-subtool change, that time `3g_tool`). This rebuild picks up everything from the four `4g_tool` entries below (Sector ID / Number of cells in Sector / CA Relation Audit columns, the CAREL Correction sheet, and the duplicate-cellName fix + red highlight) into the standalone exe's interactive "Generate 4G Summary" feature. `DumpWatcher2` already had all of this since it runs `4g_tool` from source — this rebuild is only needed for people running the exe directly.
+
 ## 4G Tool — highlight duplicate cellName in LNCEL Details — August 2026
 
 ### Added — red highlight on duplicate `LNCEL name` cells
