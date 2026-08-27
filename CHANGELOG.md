@@ -7,6 +7,11 @@
 ### Added — Site Name parsed from cellName, flagged when it differs from LNBTS Name
 A cell's `cellName` (once renamed to the sector-encoded convention) is `<site>_L<band>_<sector>` — but `<site>` is not always the same text as the LNBTS's own `name`, e.g. LNBTS `NAIROBI_PARKSIDE_TOWERS` hosting cells named `NAIROBI_PARKSIDE_INDOOR_L21_A` etc. The new `Site Name` column (right after `LNBTS Name`) surfaces that parsed site prefix, and is highlighted a neutral light blue whenever it differs from `LNBTS Name` — not red/yellow, since this isn't necessarily a mistake, just an LNBTS worth noticing has two site "parts". Tested against the real 27-Aug dumps (both a fresh raw XML→xlsx re-parse and the live scheduled `4G.270826.xlsb`): 718 of 31,843 cells nationally flagged.
 
+## Version 6.5.3 — August 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
+
+### Rebuilt exe to bundle the updated `4g_tool`
+No changes to the core parser script — same pattern as V6.1.2, V6.5.1, and V6.5.2 (a same-script exe rebuild for a bundled-subtool change). Picks up the "Site Name" column (previous entry above) into the exe's 4G summary generation.
+
 ## Version 6.5.2 — August 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
 
 ### Rebuilt exe to bundle the updated `hw_tool`
