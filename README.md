@@ -54,10 +54,10 @@ Requires [PyInstaller](https://pyinstaller.org/):
 
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
-pyinstaller spec/OSS_XML_Parser_V6.5.spec --distpath dist_v65 --workpath build_v65
+pyinstaller spec/OSS_XML_Parser_V6.5.2.spec --distpath dist_v652 --workpath build_v652
 ```
 
-The compiled exe will appear in `dist_v65/`.
+The compiled exe will appear in `dist_v652/`.
 
 > **Note:** The spec file references `../2g_tool`, `../3g_tool`, `../4g_tool`, and `../hw_tool` relative to its location in `spec/`. Run PyInstaller from the repo root as shown above.
 
@@ -113,6 +113,7 @@ nokia-oss-xml-parser/
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
+│   ├── OSS_XML_Parser_V6.5.2.spec
 │   ├── OSS_XML_Parser_V6.5.1.spec
 │   ├── OSS_XML_Parser_V6.5.spec
 │   ├── OSS_XML_Parser_V6.4.spec
@@ -121,6 +122,7 @@ nokia-oss-xml-parser/
 │   ├── OSS_XML_Parser_V6.1.2.spec
 │   ├── OSS_XML_Parser_V6.0.spec
 │   ├── OSS_XML_Parser_V5.1.spec
+│   ├── version_info_v652.txt
 │   ├── version_info_v651.txt
 │   ├── version_info_v65.txt
 │   ├── version_info_v64.txt
@@ -141,7 +143,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.5.1** | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `4g_tool` (Sector ID / CAREL Correction sheet) — same pattern as V6.1.2 |
+| **V6.5.2** | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `hw_tool` ("Combined RMOD" / "Combined BBMOD" columns) — same pattern as V6.1.2 / V6.5.1 |
+| V6.5.1 | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `4g_tool` (Sector ID / CAREL Correction sheet) — same pattern as V6.1.2 |
 | V6.5 | Fixes crash on numeric-looking text values (e.g. serial numbers) overflowing to infinity |
 | V6.4 | Streaming parse — 2× faster parse phase, 3.6× lower peak RAM |
 | V6.3 | Single-pass MO block slicing (~29% faster parse); bundles 4G InterFreq HO Check |
