@@ -96,13 +96,16 @@ def _make_formats(wb):
     red   = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
     pink  = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFBFCE', 'font_color': '#7B004F'})
     yellow = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#FFEB9C', 'font_color': '#9C6500'})
+    # Neutral "worth noticing, not a mistake" highlight -- e.g. an LNBTS that
+    # actually spans two differently-named physical sites.
+    info  = wb.add_format({'border': 1, 'valign': 'vcenter', 'bg_color': '#D9E1F2', 'font_color': '#1F4E5C'})
     # wrapped variants for multi-line cells (e.g. per-relation LNHOIF list)
     wrap     = wb.add_format({'border': 1, 'valign': 'vcenter', 'text_wrap': True})
     wrap_red = wb.add_format({'border': 1, 'valign': 'vcenter', 'text_wrap': True,
                               'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
     return dict(hdr=hdr, cell=cell, num=num, dec1=dec1, dec2=dec2,
                 fdd=fdd, tdd=tdd, mixed=mixed, red=red, pink=pink, yellow=yellow,
-                wrap=wrap, wrap_red=wrap_red)
+                info=info, wrap=wrap, wrap_red=wrap_red)
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +202,7 @@ def _iter_lnbts_rows(network):
 # ---------------------------------------------------------------------------
 
 _LNCEL_COLS = [
-    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Name', 'LNCEL name', 'Sector ID', 'LNCEL ID',
+    'MRBTS ID', 'LNBTS ID', 'LNBTS Name', 'Site Name', 'Name', 'LNCEL name', 'Sector ID', 'LNCEL ID',
     'Admin State',
     'MCC', 'MNC', 'PCI', 'RSI', 'EARFCN DL', 'Ch BW (MHz)',
     'PMAX (dBm)', 'dlRsBoost', 'RS Power (dBm)', 'DL MIMO Mode', 'Array Mode', 'TAC', 'Tilt',
@@ -215,7 +218,7 @@ _LNCEL_NUM = {
 _LNCEL_DEC1 = {'Ch BW (MHz)', 'PMAX (dBm)', 'RS Power (dBm)', 'Tilt'}
 _LNCEL_DEC2 = {'dlRsBoost'}
 _LNCEL_WIDTHS = {
-    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'Name': 22, 'LNCEL name': 22,
+    'MRBTS ID': 12, 'LNBTS ID': 12, 'LNBTS Name': 22, 'Site Name': 22, 'Name': 22, 'LNCEL name': 22,
     'Sector ID': 10,
     'LNCEL ID': 9, 'Admin State': 12, 'MCC': 7, 'MNC': 7,
     'PCI': 7, 'RSI': 7, 'EARFCN DL': 11, 'Ch BW (MHz)': 12,
@@ -264,6 +267,7 @@ def _build_lncel_details(wb, fmt, network, log, rows):
         capr_missing   = rd.get('_capr_missing', False)
         tac_red        = rd.get('LNBTS ID', '') in inconsistent_tac_lnbts
         dup_cellname   = rd.get('_dup_cellname', False)
+        site_name_diff = rd.get('_site_name_diff', False)
 
         mrbts_id = rd.get('MRBTS ID', '')
         for ci, col in enumerate(_LNCEL_COLS):
@@ -302,6 +306,8 @@ def _build_lncel_details(wb, fmt, network, log, rows):
                     ws.write_number(ri, ci, n, f)
                 else:
                     ws.write_blank(ri, ci, f)
+            elif col == 'Site Name':
+                ws.write(ri, ci, val, fmt['info'] if site_name_diff else fmt['cell'])
             elif col == 'LNCEL name':
                 ws.write(ri, ci, val, fmt['red'] if dup_cellname else fmt['cell'])
             elif col == 'IRFIM {Prio} List':
@@ -406,13 +412,17 @@ def _iter_lncel_rows(network):
 
     sector_count_by_dn = {}
     sector_letter_by_dn = {}
+    site_name_by_dn = {}   # lncel_dn -> site prefix parsed out of its cellName
     ca_audit_by_dn = {}
     dup_name_dns = set()   # lncel_dn -> shares its cellName with a sector-mate
     for group_key, members in sector_groups.items():
-        sector_letter = group_key[-1]   # (lnbts_dn, site_prefix, sector) -> sector
+        # group_key = (lnbts_dn, site_prefix, sector)
+        site_prefix   = group_key[1]
+        sector_letter = group_key[-1]
         for dn in members:
             sector_count_by_dn[dn] = len(members)
             sector_letter_by_dn[dn] = sector_letter
+            site_name_by_dn[dn] = site_prefix
         if len(members) < 2:
             continue   # single band in this sector -- nothing to relate to
         member_set = set(members)
@@ -612,10 +622,13 @@ def _iter_lncel_rows(network):
         sib_rec         = network.sib_by_lncel_dn.get(lncel_k, {})
         cell_resel_prio = get(sib_rec, 'cellReSelPrio')
 
+        site_name = site_name_by_dn.get(lncel_k, '')
+
         yield {
             'MRBTS ID':        mrbts,
             'LNBTS ID':        lnbts,
             'LNBTS Name':      lnbts_name,
+            'Site Name':       site_name,
             'Name':            name_val,
             'LNCEL name':      cell_name,
             'Sector ID':       sector_letter_by_dn.get(lncel_k, ''),
@@ -653,6 +666,7 @@ def _iter_lncel_rows(network):
             '_cell_all_low':   cell_all_low,
             '_lncel_k':        lncel_k,
             '_dup_cellname':   lncel_k in dup_name_dns,
+            '_site_name_diff': bool(site_name) and site_name.upper() != (lnbts_name or '').upper(),
             '_t2_raw':         t2_raw,
             '_t2a_raw':        t2a_raw,
         }
