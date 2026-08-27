@@ -7,6 +7,10 @@ Builds a 3-sheet Excel workbook from INVUNIT + MRBTS/LNBTS data:
                                    inventoryUnitType, cell = total count.
                                    Row 0 = group banner (RMOD / BBMOD / SMOD / Others),
                                    Row 1 = column headers, Row 2+ = data.
+                                   Two extra trailing columns, "Combined RMOD"
+                                   and "Combined BBMOD", collapse each site's
+                                   RMOD / BBMOD unit counts into one string
+                                   like "1*AHDA+2*ARDA+3*AHEGC".
   Sheet 2 "Site wise (Working)" — same layout but only state=working units
   Sheet 3 "Overall"             — one row per inventoryUnitType,
                                    columns: Working | Total | Group
@@ -19,6 +23,7 @@ Column ordering for inventoryUnitType (determined by vendorUnitFamilyType):
   Within each group: alphabetical by inventoryUnitType name.
 """
 
+import re
 from collections import defaultdict
 from itertools import groupby
 
@@ -58,6 +63,35 @@ def _is_working(state_val):
         return False
     s = str(state_val).strip().lower()
     return s in ('working', '1')
+
+
+_CODE_TOKEN_RE = re.compile(r'^[A-Z0-9]{2,}$')
+
+
+def _short_code(inv_type):
+    """
+    Best-effort short module code for an inventoryUnitType label.
+
+    Plain codes ('AHDA', 'UNKNOWN') pass through unchanged. Descriptive
+    labels made of a code plus a product name ('ABIA AirScale Capacity',
+    'BB Extension Outdoor Sub-Module FBBA') are reduced to just the code —
+    the last all-caps/digits token found — since that's what's short enough
+    to use in a combined "1*AHDA+2*ARDA" style string.
+    """
+    if ' ' not in inv_type:
+        return inv_type
+    tokens = [t for t in inv_type.split() if _CODE_TOKEN_RE.match(t)]
+    return tokens[-1] if tokens else inv_type
+
+
+def _combined_string(count_dict, mrbts, inv_types):
+    """'1*AHDA+2*ARDA+3*AHEGC' style summary of non-zero counts for inv_types."""
+    parts = [
+        f'{cnt}*{_short_code(t)}'
+        for t in inv_types
+        if (cnt := count_dict[mrbts].get(t, 0))
+    ]
+    return '+'.join(parts)
 
 
 def _group_key(fam_type):
@@ -228,6 +262,9 @@ def build_hw_report(sheets, output_path):
     col_hdr_fmt, grp_fmt, grp_cell_fmt, str_fmt, num_fmt, zero_fmt, int_fmt, coord_fmt = \
         _make_formats(wb, _GROUP_COLORS, _GROUP_FONT_COLORS)
 
+    rmod_types  = [t for t in all_inv_types if inv_group[t] == 0]
+    bbmod_types = [t for t in all_inv_types if inv_group[t] == 1]
+
     def _write_site_sheet(ws_name, count_dict):
         ws = wb.add_worksheet(ws_name)
         # freeze at row 2 (below group banner + header), col 4 (after MRBTS + Site Name + Lat + Lng)
@@ -237,6 +274,8 @@ def build_hw_report(sheets, output_path):
 
         n_inv = len(all_inv_types)
         n_hdr = n_inv + 4   # total columns (MRBTS, Site Name, Lat, Lng, + inv types)
+        col_combined_rmod  = n_hdr        # trailing "Combined RMOD" column
+        col_combined_bbmod = n_hdr + 1    # trailing "Combined BBMOD" column
 
         # ── Row 0: group banner ───────────────────────────────────────────────
         ws.set_row(0, 18)
@@ -253,6 +292,10 @@ def build_hw_report(sheets, output_path):
                 ws.write(0, c_start, label, fmt)
             else:
                 ws.merge_range(0, c_start, 0, c_end, label, fmt)
+        # Trailing combined columns: blank banner cells, same style as the
+        # leading MRBTS/Site Name/Lat/Lng block.
+        ws.write(0, col_combined_rmod,  '', col_hdr_fmt)
+        ws.write(0, col_combined_bbmod, '', col_hdr_fmt)
 
         # ── Row 1: column headers ─────────────────────────────────────────────
         ws.set_row(1, 45)
@@ -262,12 +305,16 @@ def build_hw_report(sheets, output_path):
         ws.write(1, 3, 'Longitude', col_hdr_fmt)
         for c, inv_type in enumerate(all_inv_types, start=4):
             ws.write(1, c, inv_type, col_hdr_fmt)
+        ws.write(1, col_combined_rmod,  'Combined RMOD',  col_hdr_fmt)
+        ws.write(1, col_combined_bbmod, 'Combined BBMOD', col_hdr_fmt)
 
         # ── Column widths ─────────────────────────────────────────────────────
         ws.set_column(0, 0, 10)           # MRBTS
         ws.set_column(1, 1, 32)           # Site Name
         ws.set_column(2, 3, 14)           # Latitude, Longitude
         ws.set_column(4, n_hdr - 1, 9)   # count columns
+        ws.set_column(col_combined_rmod,  col_combined_rmod,  40)
+        ws.set_column(col_combined_bbmod, col_combined_bbmod, 30)
 
         # ── Data rows (start at row 2) ────────────────────────────────────────
         for r, mrbts in enumerate(all_mrbts, start=2):
@@ -290,6 +337,17 @@ def build_hw_report(sheets, output_path):
                     ws.write(r, c, cnt, num_fmt)
                 else:
                     ws.write_blank(r, c, None, zero_fmt)
+
+            rmod_str  = _combined_string(count_dict, mrbts, rmod_types)
+            bbmod_str = _combined_string(count_dict, mrbts, bbmod_types)
+            if rmod_str:
+                ws.write(r, col_combined_rmod, rmod_str, str_fmt)
+            else:
+                ws.write_blank(r, col_combined_rmod, None, str_fmt)
+            if bbmod_str:
+                ws.write(r, col_combined_bbmod, bbmod_str, str_fmt)
+            else:
+                ws.write_blank(r, col_combined_bbmod, None, str_fmt)
 
     _write_site_sheet('Site wise (All)',     all_counts)
     _write_site_sheet('Site wise (Working)', working_counts)
