@@ -2,6 +2,11 @@
 
 ---
 
+## HW Tool — "Combined RMOD" / "Combined BBMOD" columns — August 2026
+
+### Added — per-site combined module summary columns
+Both `Site wise (All)` and `Site wise (Working)` sheets now have two trailing columns, `Combined RMOD` and `Combined BBMOD`, that collapse each site's non-zero RMOD / BBMOD unit counts into one summary string, e.g. `1*AHDA+2*ARDA+3*AHEGC`. Descriptive inventoryUnitType labels (e.g. `ABIA AirScale Capacity`, `BB Extension Outdoor Sub-Module FBBA`) are reduced to just the trailing module code (`ABIA`, `FBBA`) for the summary; plain codes and `UNKNOWN` pass through unchanged.
+
 ## Version 6.5.1 — August 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
 
 ### Rebuilt exe to bundle the updated `4g_tool`
