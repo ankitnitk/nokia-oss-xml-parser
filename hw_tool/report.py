@@ -7,10 +7,13 @@ Builds a 3-sheet Excel workbook from INVUNIT + MRBTS/LNBTS data:
                                    inventoryUnitType, cell = total count.
                                    Row 0 = group banner (RMOD / BBMOD / SMOD / Others),
                                    Row 1 = column headers, Row 2+ = data.
-                                   Two extra trailing columns, "Combined RMOD"
-                                   and "Combined BBMOD", collapse each site's
-                                   RMOD / BBMOD unit counts into one string
-                                   like "1*AHDA+2*ARDA+3*AHEGC".
+                                   Three extra trailing columns, "Combined
+                                   RMOD", "Combined BBMOD" and "Combined SMOD",
+                                   collapse each site's RMOD / BBMOD / SMOD
+                                   unit counts into one string like
+                                   "1*AHDA+2*ARDA+3*AHEGC". "Combined SMOD"
+                                   excludes CORE_* inventoryUnitTypes (core-
+                                   site variants of the same module).
   Sheet 2 "Site wise (Working)" — same layout but only state=working units
   Sheet 3 "Overall"             — one row per inventoryUnitType,
                                    columns: Working | Total | Group
@@ -264,6 +267,10 @@ def build_hw_report(sheets, output_path):
 
     rmod_types  = [t for t in all_inv_types if inv_group[t] == 0]
     bbmod_types = [t for t in all_inv_types if inv_group[t] == 1]
+    # SMOD group excludes CORE_* variants (core-site duplicates of the same
+    # module -- not wanted in the combined summary).
+    smod_types  = [t for t in all_inv_types
+                   if inv_group[t] == 2 and not t.upper().startswith('CORE_')]
 
     def _write_site_sheet(ws_name, count_dict):
         ws = wb.add_worksheet(ws_name)
@@ -276,6 +283,7 @@ def build_hw_report(sheets, output_path):
         n_hdr = n_inv + 4   # total columns (MRBTS, Site Name, Lat, Lng, + inv types)
         col_combined_rmod  = n_hdr        # trailing "Combined RMOD" column
         col_combined_bbmod = n_hdr + 1    # trailing "Combined BBMOD" column
+        col_combined_smod  = n_hdr + 2    # trailing "Combined SMOD" column
 
         # ── Row 0: group banner ───────────────────────────────────────────────
         ws.set_row(0, 18)
@@ -296,6 +304,7 @@ def build_hw_report(sheets, output_path):
         # leading MRBTS/Site Name/Lat/Lng block.
         ws.write(0, col_combined_rmod,  '', col_hdr_fmt)
         ws.write(0, col_combined_bbmod, '', col_hdr_fmt)
+        ws.write(0, col_combined_smod,  '', col_hdr_fmt)
 
         # ── Row 1: column headers ─────────────────────────────────────────────
         ws.set_row(1, 45)
@@ -307,6 +316,7 @@ def build_hw_report(sheets, output_path):
             ws.write(1, c, inv_type, col_hdr_fmt)
         ws.write(1, col_combined_rmod,  'Combined RMOD',  col_hdr_fmt)
         ws.write(1, col_combined_bbmod, 'Combined BBMOD', col_hdr_fmt)
+        ws.write(1, col_combined_smod,  'Combined SMOD',  col_hdr_fmt)
 
         # ── Column widths ─────────────────────────────────────────────────────
         ws.set_column(0, 0, 10)           # MRBTS
@@ -315,6 +325,7 @@ def build_hw_report(sheets, output_path):
         ws.set_column(4, n_hdr - 1, 9)   # count columns
         ws.set_column(col_combined_rmod,  col_combined_rmod,  40)
         ws.set_column(col_combined_bbmod, col_combined_bbmod, 30)
+        ws.set_column(col_combined_smod,  col_combined_smod,  25)
 
         # ── Data rows (start at row 2) ────────────────────────────────────────
         for r, mrbts in enumerate(all_mrbts, start=2):
@@ -340,6 +351,7 @@ def build_hw_report(sheets, output_path):
 
             rmod_str  = _combined_string(count_dict, mrbts, rmod_types)
             bbmod_str = _combined_string(count_dict, mrbts, bbmod_types)
+            smod_str  = _combined_string(count_dict, mrbts, smod_types)
             if rmod_str:
                 ws.write(r, col_combined_rmod, rmod_str, str_fmt)
             else:
@@ -348,6 +360,10 @@ def build_hw_report(sheets, output_path):
                 ws.write(r, col_combined_bbmod, bbmod_str, str_fmt)
             else:
                 ws.write_blank(r, col_combined_bbmod, None, str_fmt)
+            if smod_str:
+                ws.write(r, col_combined_smod, smod_str, str_fmt)
+            else:
+                ws.write_blank(r, col_combined_smod, None, str_fmt)
 
     _write_site_sheet('Site wise (All)',     all_counts)
     _write_site_sheet('Site wise (Working)', working_counts)
