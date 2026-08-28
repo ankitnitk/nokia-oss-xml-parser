@@ -2,6 +2,11 @@
 
 ---
 
+## Version 6.5.4 — August 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
+
+### Rebuilt exe to bundle the updated `hw_tool`
+No changes to the core parser script — same pattern as V6.1.2, V6.5.1, V6.5.2, and V6.5.3 (a same-script exe rebuild for a bundled-subtool change). Picks up the "Combined SMOD" column (previous entry below) into the exe's HW report generation.
+
 ## HW Tool — "Combined SMOD" column — August 2026
 
 ### Added — third combined summary column, with CORE_* excluded
