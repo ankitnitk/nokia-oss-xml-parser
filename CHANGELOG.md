@@ -2,6 +2,11 @@
 
 ---
 
+## HW Tool — "Combined SMOD" column — August 2026
+
+### Added — third combined summary column, with CORE_* excluded
+Both `Site wise (All)` and `Site wise (Working)` sheets now also get a `Combined SMOD` column alongside the existing `Combined RMOD` / `Combined BBMOD` ones, e.g. `1*ASIA+1*ASIB`. Unlike RMOD/BBMOD, the SMOD group's `CORE_*` inventoryUnitTypes (`CORE_ASIA AirScale Common`, `CORE_SMOD`, etc. — core-site duplicates of the same module) are excluded entirely rather than counted. Verified against the real 28-Aug scheduled dump (`HW.280826.xlsb`, 3,590 sites): all populated, zero `CORE_` leakage.
+
 ## 4G Tool — "Site Name" column in LNCEL Details — August 2026
 
 ### Added — Site Name parsed from cellName, flagged when it differs from LNBTS Name
