@@ -2,6 +2,11 @@
 
 ---
 
+## Fix — Unicode arrow crash in HW report success log — August 2026
+
+### Fixed — UnicodeEncodeError on the "HW: Done" log line
+Two copies of the same status message — `hw_tool/main.py`'s `run_hw_report()` and `oss_xml_to_xlsx_v6.5.py`'s `_run_hw_report()` — used a `→` arrow character (U+2192). On a console whose stdout falls back to `cp1252` (has no mapping for `→`, unlike the em dash which cp1252 does support), `print()` raised `UnicodeEncodeError` right after the report had already been built and saved — so a successful run was reported as a failure. Both messages now use a plain ASCII `->`. Verified by re-running a real HW report generation under a simulated strict-`cp1252` stdout: both log lines now print cleanly and the function returns success.
+
 ## Version 6.5.4 — August 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
 
 ### Rebuilt exe to bundle the updated `hw_tool`

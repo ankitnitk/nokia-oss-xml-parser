@@ -81,19 +81,24 @@ def run_hw_report(pre_read=None, input_file=None, output_path=None,
 
     # ── Validate ─────────────────────────────────────────────────────────────
     if not sheets.get('INVUNIT'):
-        _log('HW: INVUNIT sheet not found or empty — skipping HW report.')
+        _log('HW: INVUNIT sheet not found or empty -- skipping HW report.')
         return 0
 
     has_site = sheets.get('MRBTS') or sheets.get('LNBTS')
     if not has_site:
-        _log('HW: Neither MRBTS nor LNBTS found — site names will be blank.')
+        _log('HW: Neither MRBTS nor LNBTS found -- site names will be blank.')
 
     # ── Build ────────────────────────────────────────────────────────────────
     t0    = time.perf_counter()
     count = build_hw_report(sheets, output_path)
     elapsed = time.perf_counter() - t0
 
-    _log(f'HW: Done — {count} sites → {os.path.basename(output_path)}'
+    # Plain ASCII here (not an em dash / arrow): when this runs through the
+    # main parser's progress_fn, stdout can land on a non-UTF-8 console
+    # (cp1252 on Windows), and those characters aren't representable there --
+    # print() would raise UnicodeEncodeError right after the report was
+    # already built and saved, and be reported as a failure.
+    _log(f'HW: Done -- {count} sites -> {os.path.basename(output_path)}'
          f'  ({elapsed:.1f}s)')
     return count
 
@@ -108,7 +113,7 @@ def _standalone():
     from tkinter import filedialog
 
     ap = argparse.ArgumentParser(
-        description='HW Inventory Report — Nokia OSS dump → Excel')
+        description='HW Inventory Report -- Nokia OSS dump -> Excel')
     ap.add_argument('input',  nargs='?', help='Input xlsx/xlsb file')
     ap.add_argument('-o', '--output', help='Output xlsx file')
     args = ap.parse_args()

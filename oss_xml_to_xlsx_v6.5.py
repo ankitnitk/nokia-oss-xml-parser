@@ -2060,7 +2060,11 @@ def _run_hw_report(input_file, output_path, pre_read=None):
             progress_fn = lambda m: tprint(f'  [HW] {m}'),
         )
         if count:
-            print(f'[{ts()}] HW: Done — {count} sites → '
+            # Plain ASCII arrow -- stdout can land on a non-UTF-8 console
+            # (cp1252 on Windows), which has no mapping for U+2192 and
+            # would raise UnicodeEncodeError here, after the report was
+            # already built and saved (reported as a failure regardless).
+            print(f'[{ts()}] HW: Done — {count} sites -> '
                   f'{os.path.basename(output_path)}')
         return bool(count)
 
