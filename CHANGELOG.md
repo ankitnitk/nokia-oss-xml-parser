@@ -7,6 +7,11 @@
 ### Fixed — UnicodeEncodeError on the "HW: Done" log line
 Two copies of the same status message — `hw_tool/main.py`'s `run_hw_report()` and `oss_xml_to_xlsx_v6.5.py`'s `_run_hw_report()` — used a `→` arrow character (U+2192). On a console whose stdout falls back to `cp1252` (has no mapping for `→`, unlike the em dash which cp1252 does support), `print()` raised `UnicodeEncodeError` right after the report had already been built and saved — so a successful run was reported as a failure. Both messages now use a plain ASCII `->`. Verified by re-running a real HW report generation under a simulated strict-`cp1252` stdout: both log lines now print cleanly and the function returns success.
 
+## Version 6.5.5 — August 2026  (exe rebuild, includes a small core-script fix)
+
+### Rebuilt exe — this time the core script itself changed too
+Unlike the V6.1.2 / V6.5.1–V6.5.4 rebuilds, `oss_xml_to_xlsx_v6.5.py` itself has a one-line fix this time (see previous entry above) alongside the already-fixed `hw_tool/main.py`. Verified: exe launches and its CLI conversion path works; the bundled `hw_tool/main.py` inside the built exe is byte-identical to the fixed source. (The HW/4G/2G/3G summary features are GUI-dialog-gated and can't be driven through the exe non-interactively, same limitation noted in the V6.5.1 rebuild — the fix itself was verified at the source level under a simulated `cp1252` console, see previous entry.)
+
 ## Version 6.5.4 — August 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
 
 ### Rebuilt exe to bundle the updated `hw_tool`
