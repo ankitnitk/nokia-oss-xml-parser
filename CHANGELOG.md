@@ -2,6 +2,13 @@
 
 ---
 
+## 4G Tool — "IRFIM Correction" / "LNHOIF Correction" sheets — September 2026
+
+### Added — concrete action lists for missing IRFIM/LNHOIF definitions
+LNCEL Details already flags (red) a cell missing an IRFIM or LNHOIF definition towards one of its site's other EARFCNs. Two new sheets turn that into a ready-to-use action list, one row per (cell, missing target EARFCN) pair: `MRBTS | LNBTS | LNBTS Name | LNCEL | Name | IRFIM ID`/`LNHOIF ID` `| Source EARFCN | Target EARFCN`. The new instance ID is the next id above the highest already in use on that cell (never reused), same convention as the existing CAREL Correction sheet — and, like that audit, a cell's own EARFCN is never counted as a target for itself.
+
+Verified with synthetic data (missing-only rows, ID reuse-avoidance with a non-contiguous existing id) and against the real 3-Sep scheduled dump (`4G.030926.xlsb`, national network): 170 IRFIM + 431 LNHOIF correction rows, no duplicate (cell, ID) pairs, no Source==Target rows.
+
 ## Fix — Unicode arrow crash in HW report success log — August 2026
 
 ### Fixed — UnicodeEncodeError on the "HW: Done" log line

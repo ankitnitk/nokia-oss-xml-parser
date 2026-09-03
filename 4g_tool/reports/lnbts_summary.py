@@ -8,6 +8,11 @@ Sheets:
   3. InterFreq HO Check — one row per (cell × LNHOIF frequency relation),
                           with measurement-vs-HO-trigger threshold validation
   4. Network Stats      — Working / Other / Total summary
+  5. CAREL Correction   — concrete CAREL create/delete action list, derived
+                          from LNCEL Details' "CA Relation Audit" column
+  6. IRFIM Correction   — one row per (cell, missing target EARFCN) pair
+                          flagged by LNCEL Details' IRFIM {Prio} List
+  7. LNHOIF Correction  — same as IRFIM Correction, for the LNHOIF List
 """
 
 import math
@@ -127,6 +132,14 @@ def build(network, output_path, progress_fn=None):
     _build_interfreq_ho_check(wb, fmt, network, log, lncel_rows)
     _build_network_stats(wb, fmt, network, log, lncel_rows)
     _build_carel_correction(wb, fmt, network, log)
+    _build_freq_correction(wb, fmt, network, log, lncel_rows,
+                           'IRFIM Correction', 'IRFIM ID',
+                           network.irfim_list_by_lncel_dn, 'IRFIM',
+                           '_irfim_missing_freqs')
+    _build_freq_correction(wb, fmt, network, log, lncel_rows,
+                           'LNHOIF Correction', 'LNHOIF ID',
+                           network.lnhoif_list_by_lncel_dn, 'LNHOIF',
+                           '_lnhoif_missing_freqs')
 
     wb.close()
     log(f'Workbook saved: {output_path}')
@@ -669,6 +682,9 @@ def _iter_lncel_rows(network):
             '_site_name_diff': bool(site_name) and site_name.upper() != (lnbts_name or '').upper(),
             '_t2_raw':         t2_raw,
             '_t2a_raw':        t2a_raw,
+            '_own_earfcn':          own_earfcn,
+            '_irfim_missing_freqs': sorted(required - irfim_freqs) if own_earfcn is not None else [],
+            '_lnhoif_missing_freqs': sorted(required - lnhoif_seen) if own_earfcn is not None else [],
         }
 
 
@@ -1030,3 +1046,87 @@ def _build_carel_correction(wb, fmt, network, log):
         ws.set_column(ci, ci, _CORR_WIDTHS.get(col, 15))
     if rows:
         ws.autofilter(0, 0, len(rows), len(_CORR_COLS) - 1)
+
+
+# ---------------------------------------------------------------------------
+# Sheets 6 & 7 — IRFIM Correction / LNHOIF Correction
+# ---------------------------------------------------------------------------
+# Both LNCEL Details' "IRFIM {Prio} List" and "LNHOIF List" columns flag a
+# cell red when it's missing a definition towards one of the site's other
+# EARFCNs (see the "required" / "*_missing" logic in _iter_lncel_rows).
+# These two sheets turn that into a concrete action list: one row per
+# (cell, missing target EARFCN) pair, with a ready-to-use new instance ID --
+# the next id above the highest already in use on that cell, never reused,
+# same convention as the CAREL Correction sheet above.
+
+_FREQCORR_BASE_COLS = ['MRBTS', 'LNBTS', 'LNBTS Name', 'LNCEL', 'Name']
+_FREQCORR_TAIL_COLS = ['Source EARFCN', 'Target EARFCN']
+_FREQCORR_WIDTHS = {
+    'MRBTS': 12, 'LNBTS': 12, 'LNBTS Name': 22, 'LNCEL': 9, 'Name': 22,
+    'Source EARFCN': 14, 'Target EARFCN': 14,
+}
+
+
+def _build_freq_correction(wb, fmt, network, log, lncel_rows,
+                           sheet_name, id_col, list_by_lncel_dn, id_field,
+                           missing_key):
+    """
+    Shared builder for IRFIM Correction / LNHOIF Correction.
+
+    sheet_name       — worksheet name ('IRFIM Correction' / 'LNHOIF Correction')
+    id_col           — id column header ('IRFIM ID' / 'LNHOIF ID')
+    list_by_lncel_dn — network.irfim_list_by_lncel_dn / .lnhoif_list_by_lncel_dn
+    id_field         — sheet's own instance-id field name ('IRFIM' / 'LNHOIF')
+    missing_key      — row-dict key holding the sorted list of missing target
+                       EARFCNs ('_irfim_missing_freqs' / '_lnhoif_missing_freqs')
+    """
+    log(f'Building {sheet_name} sheet...')
+    ws = wb.add_worksheet(sheet_name)
+    ws.freeze_panes(1, 0)
+
+    cols = _FREQCORR_BASE_COLS + [id_col] + _FREQCORR_TAIL_COLS
+    widths = dict(_FREQCORR_WIDTHS, **{id_col: 12})
+    num_cols = {'MRBTS', 'LNBTS', 'LNCEL', id_col, 'Source EARFCN', 'Target EARFCN'}
+
+    rows = []
+    for rd in lncel_rows:
+        missing = rd.get(missing_key) or []
+        if not missing:
+            continue
+        lncel_k  = rd['_lncel_k']
+        existing = [to_num(get(r, id_field)) for r in list_by_lncel_dn.get(lncel_k, [])]
+        next_id  = (max(existing) + 1) if existing else 1
+        for freq in missing:
+            rows.append({
+                'MRBTS': rd['MRBTS ID'], 'LNBTS': rd['LNBTS ID'],
+                'LNBTS Name': rd['LNBTS Name'], 'LNCEL': rd['LNCEL ID'],
+                'Name': rd['Name'], id_col: next_id,
+                'Source EARFCN': rd['_own_earfcn'], 'Target EARFCN': freq,
+                '_sort': (to_num(rd['MRBTS ID']), to_num(rd['LNBTS ID']),
+                          to_num(rd['LNCEL ID']), next_id),
+            })
+            next_id += 1
+
+    rows.sort(key=lambda r: r['_sort'])
+    log(f'  {len(rows):,} correction rows')
+
+    for ci, col in enumerate(cols):
+        ws.write(0, ci, col, fmt['hdr'])
+    ws.set_row(0, 30)
+
+    for ri, rd in enumerate(rows, 1):
+        for ci, col in enumerate(cols):
+            val = rd.get(col, '')
+            if col in num_cols:
+                n = to_num(val, default=None)
+                if n is not None:
+                    ws.write_number(ri, ci, n, fmt['num'])
+                else:
+                    ws.write_blank(ri, ci, fmt['num'])
+            else:
+                ws.write(ri, ci, val, fmt['cell'])
+
+    for ci, col in enumerate(cols):
+        ws.set_column(ci, ci, widths.get(col, 15))
+    if rows:
+        ws.autofilter(0, 0, len(rows), len(cols) - 1)
