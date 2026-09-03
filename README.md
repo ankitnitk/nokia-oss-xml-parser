@@ -54,10 +54,10 @@ Requires [PyInstaller](https://pyinstaller.org/):
 
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
-pyinstaller spec/OSS_XML_Parser_V6.5.5.spec --distpath dist_v655 --workpath build_v655
+pyinstaller spec/OSS_XML_Parser_V6.5.6.spec --distpath dist_v656 --workpath build_v656
 ```
 
-The compiled exe will appear in `dist_v655/`.
+The compiled exe will appear in `dist_v656/`.
 
 > **Note:** The spec file references `../2g_tool`, `../3g_tool`, `../4g_tool`, and `../hw_tool` relative to its location in `spec/`. Run PyInstaller from the repo root as shown above.
 
@@ -113,6 +113,7 @@ nokia-oss-xml-parser/
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
+│   ├── OSS_XML_Parser_V6.5.6.spec
 │   ├── OSS_XML_Parser_V6.5.5.spec
 │   ├── OSS_XML_Parser_V6.5.4.spec
 │   ├── OSS_XML_Parser_V6.5.3.spec
@@ -125,6 +126,7 @@ nokia-oss-xml-parser/
 │   ├── OSS_XML_Parser_V6.1.2.spec
 │   ├── OSS_XML_Parser_V6.0.spec
 │   ├── OSS_XML_Parser_V5.1.spec
+│   ├── version_info_v656.txt
 │   ├── version_info_v655.txt
 │   ├── version_info_v654.txt
 │   ├── version_info_v653.txt
@@ -149,7 +151,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.5.5** | Exe rebuild with a small core-script fix (Unicode arrow crash in HW report success log) plus the already-fixed `hw_tool/main.py` |
+| **V6.5.6** | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `4g_tool` ("IRFIM Correction" / "LNHOIF Correction" sheets) |
+| V6.5.5 | Exe rebuild with a small core-script fix (Unicode arrow crash in HW report success log) plus the already-fixed `hw_tool/main.py` |
 | V6.5.4 | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `hw_tool` ("Combined SMOD" column) — same pattern as V6.1.2 / V6.5.1 / V6.5.2 / V6.5.3 |
 | V6.5.3 | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `4g_tool` ("Site Name" column in LNCEL Details) — same pattern as V6.1.2 / V6.5.1 / V6.5.2 |
 | V6.5.2 | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `hw_tool` ("Combined RMOD" / "Combined BBMOD" columns) — same pattern as V6.1.2 / V6.5.1 |
