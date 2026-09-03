@@ -2,6 +2,11 @@
 
 ---
 
+## Version 6.5.6 — September 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
+
+### Rebuilt exe to bundle the updated `4g_tool`
+No changes to the core parser script — same pattern as V6.1.2, V6.5.1–V6.5.4 (V6.5.5 also touched the core script; this one doesn't). Picks up the "IRFIM Correction" / "LNHOIF Correction" sheets (previous entry below) into the exe's 4G summary generation.
+
 ## 4G Tool — "IRFIM Correction" / "LNHOIF Correction" sheets — September 2026
 
 ### Added — concrete action lists for missing IRFIM/LNHOIF definitions
