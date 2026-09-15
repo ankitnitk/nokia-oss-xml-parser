@@ -2,6 +2,11 @@
 
 ---
 
+## Version 6.5.7 — September 2026  (exe rebuild, includes a core-script fix)
+
+### Rebuilt exe — CAREL Correction "Delete" fix
+Like V6.5.5, the core script itself changed this time (see previous entry): `_run_4g_summary()` / `_run_3g_summary()` now read `Network.NEEDED_SHEETS` instead of a stale hand-copied list, fixing CAREL Correction never proposing deletes when a 4G summary is built from an already-parsed file. Verified: exe launches and its CLI conversion path works. The affected feature ("Generate 4G Summary" from an existing file) is GUI-dialog-gated and can't be driven through the exe non-interactively — the fix itself was verified at the source level against the real dump that surfaced the bug (226 Create/0 Delete before, 96 Delete/12 Create after).
+
 ## Fix — 4G summary never read CAREL when built from an existing file — September 2026
 
 ### Fixed — CAREL Correction only ever proposed "Create", never "Delete"
