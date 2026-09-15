@@ -2,6 +2,19 @@
 
 ---
 
+## Fix — 4G summary never read CAREL when built from an existing file — September 2026
+
+### Fixed — CAREL Correction only ever proposed "Create", never "Delete"
+`oss_xml_to_xlsx_v6.5.py`'s `_run_4g_summary()` reads sheets itself (via its own hardcoded `NEEDED` list) whenever it's given an already-parsed .xlsx/.xlsb file directly — as opposed to running inside the full XML-dump pipeline, where `pre_read` already has every sheet in memory. That hardcoded list was missing `'CAREL'`, so this path (used by the exe's "Generate 4G Summary" feature, and any other standalone call with just an input file) never read CAREL relations at all.
+
+With no CAREL data loaded, the CAREL Correction sheet's Delete-detection loop had nothing to check (zero relations known -> zero deletes), and the Create-detection loop believed every cross-band same-sector cell pair was unrelated -- so it proposed (re-)creating relations that already existed correctly, alongside the genuinely missing ones, massively inflating the Create count and hiding every real deletion candidate.
+
+`'CAREL'` was added to `4g_tool/network.py`'s own `Network.NEEDED_SHEETS` back when the CAREL Correction sheet was first built (commit `b971c49`, Aug 25) — this hand-copied duplicate in the main script was simply never updated to match. Fixed by reusing `Network.NEEDED_SHEETS` directly instead of a separately maintained list (also applied to `_run_3g_summary` as a preventive measure, since it duplicates the same pattern and would silently drift the same way if 3G ever gains a new required sheet).
+
+Root-caused and reproduced exactly (226 Create / 0 Delete) against a real test dump reported by a colleague; after the fix, the same dump correctly yields 96 Delete + 12 Create -- spot-checked by hand (e.g. `GIKUNI_L8_A` had two legitimate cross-sector CAREL relations that should never have existed).
+
+Only affects the "existing file -> summary" path (the exe/GUI feature, or any standalone `_run_4g_summary(file)` call). Unaffected: the full XML-dump pipeline (uses in-memory `pre_read`, which already has every class) and `nokia-kpi-scripts`' `DumpWatcher2.py` (has its own `_run_4g_summary` that already uses `Network.NEEDED_SHEETS` directly).
+
 ## Version 6.5.6 — September 2026  (exe rebuild, same `oss_xml_to_xlsx_v6.5.py`)
 
 ### Rebuilt exe to bundle the updated `4g_tool`

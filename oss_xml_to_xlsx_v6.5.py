@@ -1912,8 +1912,13 @@ def _run_4g_summary(input_file, output_path, pre_read=None):
             sheets = pre_read
         else:
             from xlsx_reader import read_xlsx
-            NEEDED = ['LNBTS', 'LNBTS_FDD', 'LNBTS_TDD', 'LNCEL', 'LNCEL_FDD',
-                      'LNCEL_TDD', 'IRFIM', 'LNHOIF', 'SIB', 'REDRT', 'CAPR']
+            # Reuse 4g_tool's own authoritative list instead of a hand-copied
+            # one -- a hardcoded copy here silently drifted out of sync when
+            # 'CAREL' was added to Network.NEEDED_SHEETS (for CAREL
+            # Correction), so this path never read CAREL relations at all
+            # when generating a summary from an existing file (pre_read is
+            # only populated by the full XML-dump pipeline, not this one).
+            NEEDED = Network.NEEDED_SHEETS
             print(f'[{ts()}] 4G: Reading {os.path.basename(input_file)} ...')
             sheets = read_xlsx(input_file, sheet_names=NEEDED,
                                progress_fn=lambda m: tprint(f'  [4G] {m}'))
@@ -2011,7 +2016,7 @@ def _run_3g_summary(input_file, output_path, pre_read=None):
             sheets = pre_read
         else:
             from xlsx_reader import read_xlsx
-            NEEDED = ['RNC', 'WBTS', 'WCEL', 'WNCEL']
+            NEEDED = Network.NEEDED_SHEETS   # reuse 3g_tool's own list (see 4G fix)
             print(f'[{ts()}] 3G: Reading {os.path.basename(input_file)} ...')
             sheets = read_xlsx(input_file, sheet_names=NEEDED,
                                progress_fn=lambda m: tprint(f'  [3G] {m}'))
