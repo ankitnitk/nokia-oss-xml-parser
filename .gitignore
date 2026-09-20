@@ -2,6 +2,7 @@
 build/
 build_v*/
 dist/
+dist_v*/
 *.spec.bak
 
 # Python cache
