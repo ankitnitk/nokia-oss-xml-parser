@@ -46,6 +46,8 @@ A GUI dialog will open to select input files and MO classes. Output is saved as 
 
 Download the latest `OSS_XML_Parser_vX.X.exe` from [Releases](../../releases) and run it directly — no Python installation needed.
 
+**If the exe won't start on a managed/corporate machine**, download the `_folder.zip` build instead, unzip it anywhere and run the exe inside. The single-file exe unpacks itself into `%TEMP%\_MEIxxxxxx` on every launch and loads its DLLs from there; AppLocker / WDAC rules and Defender ASR ("Block executable content from running unless it meets a prevalence, age, or trusted list criterion") commonly block that, which makes the same exe work on one Windows 11 machine and fail on another. The folder build never extracts at runtime, so it isn't affected — and starts noticeably faster.
+
 ---
 
 ## Building the exe
@@ -54,12 +56,19 @@ Requires [PyInstaller](https://pyinstaller.org/):
 
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
-pyinstaller spec/OSS_XML_Parser_V6.5.7.spec --distpath dist_v657 --workpath build_v657
+
+# single-file exe -> dist_v658/
+pyinstaller spec/OSS_XML_Parser_V6.5.8.spec --distpath dist_v658 --workpath build_v658
+
+# folder build (max compatibility, faster startup) -> dist_v658_folder/
+pyinstaller spec/OSS_XML_Parser_V6.5.8_folder.spec --distpath dist_v658_folder --workpath build_v658_folder
 ```
 
-The compiled exe will appear in `dist_v657/`.
+Both specs share the same code and the same exclude list; they differ only in onefile vs onedir packaging.
 
 > **Note:** The spec file references `../2g_tool`, `../3g_tool`, `../4g_tool`, and `../hw_tool` relative to its location in `spec/`. Run PyInstaller from the repo root as shown above.
+
+> **Do not re-enable UPX.** Both specs pin `upx=False`. UPX-packed executables are a frequent antivirus false positive, and the setting was previously `True` but silently inert (no UPX on PATH) — a build on a machine that had UPX installed would have produced a very different, AV-prone binary.
 
 ---
 
@@ -113,6 +122,8 @@ nokia-oss-xml-parser/
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
+│   ├── OSS_XML_Parser_V6.5.8.spec
+│   ├── OSS_XML_Parser_V6.5.8_folder.spec
 │   ├── OSS_XML_Parser_V6.5.7.spec
 │   ├── OSS_XML_Parser_V6.5.6.spec
 │   ├── OSS_XML_Parser_V6.5.5.spec
@@ -127,6 +138,7 @@ nokia-oss-xml-parser/
 │   ├── OSS_XML_Parser_V6.1.2.spec
 │   ├── OSS_XML_Parser_V6.0.spec
 │   ├── OSS_XML_Parser_V5.1.spec
+│   ├── version_info_v658.txt
 │   ├── version_info_v657.txt
 │   ├── version_info_v656.txt
 │   ├── version_info_v655.txt
@@ -153,7 +165,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.5.7** | Exe rebuild with a core-script fix: CAREL Correction now correctly proposes deletes (was always reading zero CAREL relations when built from an existing file) |
+| **V6.5.8** | Packaging only (no code change): 40% smaller (23.6 -> 14.1 MB) by dropping unused Pillow / Pythonwin+MFC / OpenSSL, `upx=False` pinned, plus a new folder (onedir) build that avoids the `%TEMP%` extraction corporate policies block |
+| V6.5.7 | Exe rebuild with a core-script fix: CAREL Correction now correctly proposes deletes (was always reading zero CAREL relations when built from an existing file) |
 | V6.5.6 | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `4g_tool` ("IRFIM Correction" / "LNHOIF Correction" sheets) |
 | V6.5.5 | Exe rebuild with a small core-script fix (Unicode arrow crash in HW report success log) plus the already-fixed `hw_tool/main.py` |
 | V6.5.4 | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `hw_tool` ("Combined SMOD" column) — same pattern as V6.1.2 / V6.5.1 / V6.5.2 / V6.5.3 |

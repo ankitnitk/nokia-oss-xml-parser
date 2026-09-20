@@ -2,6 +2,45 @@
 
 ---
 
+## Version 6.5.8 — September 2026  (packaging only: slimmer, faster, more compatible)
+
+**No code changes.** `oss_xml_to_xlsx_v6.5.py` and all four tools are byte-identical to V6.5.7 — only the PyInstaller packaging changed. Prompted by the exe running fine on some Windows 11 machines and failing on others.
+
+### Smaller — 23.6 MB → 14.1 MB (-40%)
+Three chunks of dead weight were being bundled, each verified unused before removal:
+
+| Dropped | Size | Why it was safe |
+|---|---|---|
+| `PIL` / Pillow | 5.7 MB (`_avif.pyd` alone was 4.3 MB) | openpyxl pulls it in only for embedded-image support; no tool here reads or writes images |
+| `Pythonwin` / `win32ui` (incl. `mfc140u.dll`) | 3.0 MB | Excel automation is late-bound `win32com.client.DispatchEx` only — never `win32ui`, never `gencache`/`EnsureDispatch` |
+| `ssl` / `_ssl` (`libcrypto-3.dll`, `libssl-3.dll`) | 2.1 MB | no network I/O anywhere in the codebase |
+
+Also `optimize=2` (no asserts or docstring-dependent code exists, so stripping both is safe) and a few dev-only stdlib modules (`unittest`, `doctest`, `pdb`, `pydoc`).
+
+### More compatible
+- **`upx=False` is now explicit.** It was `upx=True`, but silently a no-op because UPX isn't on this build machine's PATH — so any future build on a machine that *does* have UPX would have produced a UPX-packed exe, one of the most common antivirus false positives. Pinned off so builds stay identical everywhere.
+- **Dropping `mfc140u.dll`** removes an MFC redistributable that corporate AV/EDR frequently flags.
+- **New folder (onedir) variant** — see below. This is the real fix for policy-blocked machines.
+
+### New: `OSS_XML_Parser_v6.5.8_folder.zip` (onedir build)
+A onefile exe unpacks its whole payload into `%TEMP%\_MEIxxxxxx` on *every* launch and loads its DLLs/`.pyd`s from there. Managed Windows fleets routinely block exactly that — AppLocker / WDAC rules and the Defender ASR rule *"Block executable content from running unless it meets a prevalence, age, or trusted list criterion"* deny loading executable code out of a user-writable temp path. That is the most likely reason the same exe runs on one Windows 11 box and dies on the next.
+
+The folder build never extracts anything at runtime, so it sidesteps that entire class of policy failure — and starts faster for the same reason. Built from `spec/OSS_XML_Parser_V6.5.8_folder.spec`; identical code and excludes, distributed as a zipped folder.
+
+### Faster startup
+| Build | Startup (avg of 3) |
+|---|---|
+| V6.5.7 onefile | 3341 ms |
+| V6.5.8 onefile | 3340 ms |
+| **V6.5.8 folder** | **2057 ms** |
+
+Slimming alone didn't move startup — the cost is the onefile unpack step itself, not payload size — so the folder build is where the win is. Parse/write throughput is unchanged (it was never import-bound).
+
+### Verified identical, not just "it launches"
+- Same real dump (`OSS2.HWDump.190926.xml.gz`) through V6.5.7, V6.5.8 onefile and V6.5.8 folder: **332,939 records, 23 sheets, 333,012 rows — zero differences** between all three outputs.
+- All four summary generators (2G / 3G / 4G / HW) re-run on real data with every excluded module *hard-blocked at import level*, to prove nothing silently depended on them: all four produced full output (2G 7 sheets incl. ADCE checks · 3G 8,134 cells · 4G 7 sheets incl. CAREL Correction 108 rows · HW 1,460 sites × 3 sheets).
+- 2G and 3G dumps re-converted with the new exe as part of that test.
+
 ## Version 6.5.7 — September 2026  (exe rebuild, includes a core-script fix)
 
 ### Rebuilt exe — CAREL Correction "Delete" fix
