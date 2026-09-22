@@ -2,6 +2,24 @@
 
 ---
 
+## 2G Tool — CDED / CDEF now round up, not down — September 2026
+
+### Fixed — GPRS channel counts were floored instead of ceiled
+The `Cell Details` sheet derives Master/Slave CDED and CDEF from `dedicatedGPRScapacity` / `defaultGPRScapacity` as `capacity% / 100 × GTCH`. That product was being floored; it should be ceiled. Changed in `2g_tool/network.py` — the only two rounding sites in the tool.
+
+Whole multiples are unaffected (50% of 8 GTCH is still 4). Everything fractional moves up by one: 30% of 8 = 2.40 was 2, now 3; 50% of 7 = 3.50 was 3, now 4.
+
+The worst cases were the ones that floored to zero — 12% of 8 GTCH = 0.96 reported **0 channels** for a cell that genuinely had GPRS capacity configured. On the 22-Sep network dump (`OSS2.2GDump.220926`, 6,535 cells) 997 cells were reporting a spurious 0 across the four columns:
+
+| Column | Old total | New total | Cells 0 → non-zero |
+|---|---|---|---|
+| Master CDED | 13,228 | 18,897 | 578 |
+| Master CDEF | 42,655 | 48,214 | 48 |
+| Slave CDED | 2,066 | 3,728 | 207 |
+| Slave CDEF | 7,249 | 9,059 | 164 |
+
+92.2% of cells change value. Verified with synthetic cases through `channel_type_counts()` (exact multiples unchanged, fractions round up, per-BTS slave aggregation still sums correctly) and by re-running the real dump with `math.ceil` monkeypatched back to `floor` to produce the before/after above.
+
 ## Version 6.5.8 — September 2026  (packaging only: slimmer, faster, more compatible)
 
 **No code changes.** `oss_xml_to_xlsx_v6.5.py` and all four tools are byte-identical to V6.5.7 — only the PyInstaller packaging changed. Prompted by the exe running fine on some Windows 11 machines and failing on others.

@@ -634,13 +634,13 @@ class Network:
                                 gtch_slave += 1
             gtch_per_bts[bts_dn] = (bts_r, bts_gtch)
 
-        # CDED / CDEF: floor(capacity% / 100 * bts_gtch), summed per master/slave
+        # CDED / CDEF: ceil(capacity% / 100 * bts_gtch), summed per master/slave
         cded_master = cdef_master = cded_slave = cdef_slave = 0
         for bts_dn, (bts_r, gtch) in gtch_per_bts.items():
             dedicated_cap = to_num(get(bts_r, 'dedicatedGPRScapacity')) / 100
             default_cap   = to_num(get(bts_r, 'defaultGPRScapacity'))   / 100
-            cded = math.floor(dedicated_cap * gtch)
-            cdef = math.floor(default_cap   * gtch)
+            cded = math.ceil(dedicated_cap * gtch)
+            cdef = math.ceil(default_cap   * gtch)
             if bts_dn == master_dn:
                 cded_master = cded
                 cdef_master = cdef
