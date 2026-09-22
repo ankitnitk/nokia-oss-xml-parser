@@ -2,6 +2,16 @@
 
 ---
 
+## Version 6.5.9 — September 2026  (exe rebuild, both variants)
+
+### Rebuilt both builds to carry the 2G CDED/CDEF fix
+Same `oss_xml_to_xlsx_v6.5.py`; picks up the `2g_tool` rounding fix below. Packaging is unchanged from V6.5.8 — same exclude list, `upx=False`, `optimize=2` — so the onefile is still 14.1 MB and the folder build still avoids the `%TEMP%` extraction that managed Windows fleets block.
+
+- `OSS_XML_Parser_v6.5.9.exe` — 14.07 MB, drop-in replacement.
+- `OSS_XML_Parser_v6.5.9_folder.zip` — 14.0 MB zipped; unzip and run the exe inside. Use this one on machines where the single-file exe won't start.
+
+Verified: both builds launch and parse CLI args, and the bundled `2g_tool/network.py` is byte-identical to the fixed source in each (31,391 bytes in the onefile archive; `cmp` clean against the folder build's `_internal/2g_tool/network.py`). The 2G summary itself is GUI-dialog-gated and can't be driven through a frozen exe non-interactively, so the fix was verified at source level — see the entry below.
+
 ## 2G Tool — CDED / CDEF now round up, not down — September 2026
 
 ### Fixed — GPRS channel counts were floored instead of ceiled
