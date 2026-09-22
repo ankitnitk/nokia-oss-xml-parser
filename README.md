@@ -57,11 +57,11 @@ Requires [PyInstaller](https://pyinstaller.org/):
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
 
-# single-file exe -> dist_v658/
-pyinstaller spec/OSS_XML_Parser_V6.5.8.spec --distpath dist_v658 --workpath build_v658
+# single-file exe -> dist_v659/
+pyinstaller spec/OSS_XML_Parser_V6.5.9.spec --distpath dist_v659 --workpath build_v659
 
-# folder build (max compatibility, faster startup) -> dist_v658_folder/
-pyinstaller spec/OSS_XML_Parser_V6.5.8_folder.spec --distpath dist_v658_folder --workpath build_v658_folder
+# folder build (max compatibility, faster startup) -> dist_v659_folder/
+pyinstaller spec/OSS_XML_Parser_V6.5.9_folder.spec --distpath dist_v659_folder --workpath build_v659_folder
 ```
 
 Both specs share the same code and the same exclude list; they differ only in onefile vs onedir packaging.
@@ -122,6 +122,8 @@ nokia-oss-xml-parser/
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
+│   ├── OSS_XML_Parser_V6.5.9.spec
+│   ├── OSS_XML_Parser_V6.5.9_folder.spec
 │   ├── OSS_XML_Parser_V6.5.8.spec
 │   ├── OSS_XML_Parser_V6.5.8_folder.spec
 │   ├── OSS_XML_Parser_V6.5.7.spec
@@ -138,6 +140,7 @@ nokia-oss-xml-parser/
 │   ├── OSS_XML_Parser_V6.1.2.spec
 │   ├── OSS_XML_Parser_V6.0.spec
 │   ├── OSS_XML_Parser_V5.1.spec
+│   ├── version_info_v659.txt
 │   ├── version_info_v658.txt
 │   ├── version_info_v657.txt
 │   ├── version_info_v656.txt
@@ -165,7 +168,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.5.8** | Packaging only (no code change): 40% smaller (23.6 -> 14.1 MB) by dropping unused Pillow / Pythonwin+MFC / OpenSSL, `upx=False` pinned, plus a new folder (onedir) build that avoids the `%TEMP%` extraction corporate policies block |
+| **V6.5.9** | 2G `Cell Details`: CDED/CDEF now round up instead of down — 997 cells had been reporting 0 GPRS channels despite having capacity configured |
+| V6.5.8 | Packaging only (no code change): 40% smaller (23.6 -> 14.1 MB) by dropping unused Pillow / Pythonwin+MFC / OpenSSL, `upx=False` pinned, plus a new folder (onedir) build that avoids the `%TEMP%` extraction corporate policies block |
 | V6.5.7 | Exe rebuild with a core-script fix: CAREL Correction now correctly proposes deletes (was always reading zero CAREL relations when built from an existing file) |
 | V6.5.6 | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `4g_tool` ("IRFIM Correction" / "LNHOIF Correction" sheets) |
 | V6.5.5 | Exe rebuild with a small core-script fix (Unicode arrow crash in HW report success log) plus the already-fixed `hw_tool/main.py` |
