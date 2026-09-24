@@ -456,8 +456,11 @@ def _iter_lncel_rows(network):
                     t_rec = network.lncel_by_dn.get(peer_dn, {})
                     dupes.append(get(t_rec, 'cellName') or get(t_rec, 'name') or peer_dn.rsplit('/', 1)[-1])
                     continue
-                peer_targets = network.carel_targets_by_lncel_dn.get(peer_dn, set())
-                if not (peer_dn in my_targets and dn in peer_targets):
+                # CAREL is defined per cell, not per sector pair: this cell
+                # is "OK" toward a peer as soon as IT has a relation there,
+                # regardless of whether the peer relates back (no mutuality
+                # requirement, and pcellSwapAllowed doesn't matter either).
+                if peer_dn not in my_targets:
                     missing.append(band_tag_by_dn[peer_dn])
             for t_dn in my_targets:
                 # Wrong if it points outside the sector, OR at a same-band
@@ -930,10 +933,11 @@ def _w(n):
 # ---------------------------------------------------------------------------
 # Turns the "CA Relation Audit" findings (LNCEL Details) into a concrete
 # action list: one row per CAREL relation that should be deleted (points
-# outside its cell's sector) or created (a same-sector band pair with no
-# mutual relation yet). Only covers cells whose cellName is already
-# renamed to the sector-encoded convention -- there's no sector to check
-# an un-renamed cell against.
+# outside its cell's sector) or created (a cell missing its OWN outbound
+# relation to a same-sector peer -- CAREL is per-cell, not a mutual pair
+# requirement; the peer having a relation back is irrelevant). Only
+# covers cells whose cellName is already renamed to the sector-encoded
+# convention -- there's no sector to check an un-renamed cell against.
 
 _CORR_COLS = [
     'MRBTS', 'LNBTS', 'LNCEL', 'CAREL', 'cellName',

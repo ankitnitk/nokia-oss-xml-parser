@@ -2,6 +2,13 @@
 
 ---
 
+## 4G Tool — CAREL audit: fix false "Missing" on cells with full outbound coverage — September 2026
+
+### Fixed — CA Relation Audit required mutual (bidirectional) relations; CAREL is per-cell
+`CA Relation Audit` in LNCEL Details flagged a cell "Missing: <band>" whenever the *other* side of the pair didn't also have a relation back — even when the cell itself had a complete, correct CAREL relation to every one of its sector-mates. Reported by the user against `KISUMU_MANYATTA_KOYANGO_L8_A` (LNBTS 904339): it had outbound relations (`pcellSwapAllowed=1`) to all 4 other sector-A cells, yet showed "Missing: L18, L21, L26_C1, L26_C2" because none of *those* cells had a relation back to it.
+
+Per clarification: CAREL is a per-cell/one-directional concept — a cell is complete toward a peer as soon as it has its own relation there, regardless of whether the peer relates back, and regardless of `pcellSwapAllowed`. Removed the mutual-direction requirement from the audit; a peer only counts as "Missing" if the source cell itself lacks the relation. The CAREL Correction sheet's `Create` logic was already per-cell/non-mutual (unaffected) — this was a `LNCEL Details` display-only bug. On the real dump: `L8_A/B/C` (which already had full outbound coverage) now correctly show `OK`; `L21`/`L18`/`L26_C1`/`L26_C2` (which genuinely lack their own relation to L8) still correctly show `Missing: L8`.
+
 ## Version 6.5.9 — September 2026  (exe rebuild, both variants)
 
 ### Rebuilt both builds to carry the 2G CDED/CDEF fix
