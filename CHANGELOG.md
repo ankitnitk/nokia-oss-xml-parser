@@ -2,6 +2,34 @@
 
 ---
 
+## Version 6.6 — October 2026  (`oss_xml_to_xlsx_v6.6.py`)
+
+### Improved — "zero-touch" pipeline: 3–4× faster, ~5× less memory
+V6.5 parsed on all cores, but then pushed every record through the **main process, on one core, four times**: unpickling it from the parse workers, walking it again for the shared-string pre-scan, flattening it into a row, and finally deflating the finished worksheet XML into the zip. On a large dump the other 21 cores sat idle for most of the run. V6.6 removes each of those single-threaded passes — the main process never touches a record:
+
+- **Parse** — the main thread only gunzips and cuts the stream at `managedObject` boundaries (`bytes.rfind`, no regex scan). Workers find the blocks, apply the class filter, parse, and hand back **one pickled blob per class per chunk**, which the main process keeps as opaque bytes (`ParsedData`).
+- **Shared-string pre-scan — gone.** Column orders and the set of repeated strings are produced by the parse workers as a by-product and merged with a few set operations (was 55 s single-threaded on the dump below).
+- **Write** — sheets are split into ~100k-row parts. A worker unpickles its part's blobs, generates the rows **and deflates them**; the text of number / shared-string cells is memoised, so the common cell costs one dict lookup.
+- **Assemble** — a sheet's parts are byte-concatenated into its zip entry the moment the last one arrives (own minimal zip writer + `crc32_combine`). Assembly overlaps writing, and no temp files are written.
+- **Parse worker** — numeric conversion and `Dist_Name` parts are memoised and parameter names interned (2.4× faster per core, pickled volume halved).
+
+**Measured, back to back on the same machine (22 logical CPUs, on battery), 12-Oct-2026 dumps:**
+
+| Job | V6.5 | V6.6 |
+|---|---|---|
+| Full LTE dump, all 115 classes (189 MB gz → 3.7 GB XML, 5.04 M objects, 555 MB xlsx) | 193 s, 13.4 GB peak RAM | **50 s, 2.6 GB** |
+| 4G scheduled job (OSS2+OSS3, 12 classes, 580 k records) | 86 s | **36 s** |
+| 2G scheduled job (984 k records) | 63 s | **16 s** |
+| HW scheduled job (347 k records) | 21 s | **5.6 s** |
+| 3G scheduled job (48 k records) | 24 s | **17 s** |
+| 5G scheduled job (70 k records) | 6.3 s | **2.9 s** |
+
+The `.xlsb` step (Excel itself, ~1 min for the 4G job) is unchanged — it is now the largest part of a scheduled run.
+
+**Verified:** every data cell identical to V6.5 on the full LTE dump (119 sheets, 5.04 M rows, 115 M cells compared cell by cell); all five scheduled jobs row-identical; the V6.6 `.xlsb` (via Excel) reads back record-identical through `4g_tool`, and the 4G summary built from it matches on all 7 sheets; the GUI path's in-memory snapshot for the summary tools is identical; plain `.xml`, `.gz`, `.zip`, filtered, mixed and many-file (Mode A) inputs all match; both frozen exe variants produce byte-identical worksheets to the script.
+
+**Output differences vs V6.5 (no cell value changes):** shared strings are numbered in sorted order; a record's own `Dist_Name` no longer counts towards "repeated string", so a handful of duplicated DNs are stored inline rather than shared; `sheetN.xml` numbering inside the zip follows completion order (tab order unchanged); with several input files, rows follow input order instead of whichever file finished parsing first.
+
 ## 4G Tool — CAREL audit: fix false "Missing" on cells with full outbound coverage — September 2026
 
 ### Fixed — CA Relation Audit required mutual (bidirectional) relations; CAREL is per-cell
