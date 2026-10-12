@@ -37,7 +37,7 @@ Built and maintained by **Ankit Jain**.
 ### Run from source
 
 ```
-python oss_xml_to_xlsx_v6.5.py
+python oss_xml_to_xlsx_v6.6.py
 ```
 
 A GUI dialog will open to select input files and MO classes. Output is saved as `.xlsx` (or `.xlsb` if selected).
@@ -57,11 +57,11 @@ Requires [PyInstaller](https://pyinstaller.org/):
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
 
-# single-file exe -> dist_v659/
-pyinstaller spec/OSS_XML_Parser_V6.5.9.spec --distpath dist_v659 --workpath build_v659
+# single-file exe -> dist_v66/
+pyinstaller spec/OSS_XML_Parser_V6.6.spec --distpath dist_v66 --workpath build_v66
 
-# folder build (max compatibility, faster startup) -> dist_v659_folder/
-pyinstaller spec/OSS_XML_Parser_V6.5.9_folder.spec --distpath dist_v659_folder --workpath build_v659_folder
+# folder build (max compatibility, faster startup) -> dist_v66_folder/
+pyinstaller spec/OSS_XML_Parser_V6.6_folder.spec --distpath dist_v66_folder --workpath build_v66_folder
 ```
 
 Both specs share the same code and the same exclude list; they differ only in onefile vs onedir packaging.
@@ -90,7 +90,8 @@ Requires `psutil` for RAM/CPU metrics (`pip install psutil`).
 
 ```
 nokia-oss-xml-parser/
-├── oss_xml_to_xlsx_v6.5.py   ← current release (V6.5)
+├── oss_xml_to_xlsx_v6.6.py   ← current release (V6.6)
+├── oss_xml_to_xlsx_v6.5.py   ← previous release (V6.5)
 ├── oss_xml_to_xlsx_v6.4.py   ← previous release (V6.4)
 ├── oss_xml_to_xlsx_v6.3.py   ← previous release (V6.3)
 ├── oss_xml_to_xlsx_v6.2.py   ← previous release (V6.2)
@@ -122,6 +123,10 @@ nokia-oss-xml-parser/
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
+│   ├── OSS_XML_Parser_V6.6.spec
+│   ├── OSS_XML_Parser_V6.6_folder.spec
+│   ├── OSS_XML_Parser_V6.5.10.spec
+│   ├── OSS_XML_Parser_V6.5.10_folder.spec
 │   ├── OSS_XML_Parser_V6.5.9.spec
 │   ├── OSS_XML_Parser_V6.5.9_folder.spec
 │   ├── OSS_XML_Parser_V6.5.8.spec
@@ -168,7 +173,9 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.5.9** | 2G `Cell Details`: CDED/CDEF now round up instead of down — 997 cells had been reporting 0 GPRS channels despite having capacity configured |
+| **V6.6** | Zero-touch pipeline — the main process no longer handles records at all: 3–4× faster end to end (5 M-object LTE dump 193 s → 50 s), ~5× less RAM (13.4 → 2.6 GB), same cell values |
+| V6.5.10 | Exe rebuild: 4G `CA Relation Audit` no longer requires a relation back from the peer cell (CAREL is per-cell) |
+| V6.5.9 | 2G `Cell Details`: CDED/CDEF now round up instead of down — 997 cells had been reporting 0 GPRS channels despite having capacity configured |
 | V6.5.8 | Packaging only (no code change): 40% smaller (23.6 -> 14.1 MB) by dropping unused Pillow / Pythonwin+MFC / OpenSSL, `upx=False` pinned, plus a new folder (onedir) build that avoids the `%TEMP%` extraction corporate policies block |
 | V6.5.7 | Exe rebuild with a core-script fix: CAREL Correction now correctly proposes deletes (was always reading zero CAREL relations when built from an existing file) |
 | V6.5.6 | Same `oss_xml_to_xlsx_v6.5.py` script; exe rebuilt to bundle the updated `4g_tool` ("IRFIM Correction" / "LNHOIF Correction" sheets) |
