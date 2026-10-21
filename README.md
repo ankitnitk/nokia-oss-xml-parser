@@ -17,6 +17,7 @@ Built and maintained by **Ankit Jain**.
 - **2G Summary report** — cell details (114 columns), BCF details, one-way ADCE neighbours, discrepant ADCE, co-site missing neighbours, frequency reuse, network statistics.
 - **3G Summary report** — WCDMA cell details: RNC/WBTS/WCEL hierarchy, Admin State, LAC/RAC, PSC, UARFCN, Tilt, CPICH, PMAX.
 - **4G Summary report** — LNBTS/LNCEL hierarchy, FDD/TDD split, EARFCNs, handover config, network statistics.
+- **5G Summary report** — NRBTS/NRCELL hierarchy, NRARFCN bands, PCI/RSI, SSB & CSI-RS power, MIMO mode, beam set and edge angles.
 - **HW Inventory report** — per-site unit counts (all states + working-only) and network-wide totals; columns grouped and colour-coded by hardware family (RMOD / BBMOD / SMOD / Others).
 - **XLSB output** — optional Excel Binary format via hidden COM automation (smaller files, faster to open in Excel).
 - **Config persistence** — MO class selection is saved between runs.
@@ -37,7 +38,7 @@ Built and maintained by **Ankit Jain**.
 ### Run from source
 
 ```
-python oss_xml_to_xlsx_v6.6.py
+python oss_xml_to_xlsx_v7.py
 ```
 
 A GUI dialog will open to select input files and MO classes. Output is saved as `.xlsx` (or `.xlsb` if selected).
@@ -57,11 +58,11 @@ Requires [PyInstaller](https://pyinstaller.org/):
 ```
 pip install pyinstaller python-calamine openpyxl xlsxwriter
 
-# single-file exe -> dist_v66/
-pyinstaller spec/OSS_XML_Parser_V6.6.spec --distpath dist_v66 --workpath build_v66
+# single-file exe -> dist_v7/
+pyinstaller spec/OSS_XML_Parser_V7.spec --distpath dist_v7 --workpath build_v7
 
-# folder build (max compatibility, faster startup) -> dist_v66_folder/
-pyinstaller spec/OSS_XML_Parser_V6.6_folder.spec --distpath dist_v66_folder --workpath build_v66_folder
+# folder build (max compatibility, faster startup) -> dist_v7_folder/
+pyinstaller spec/OSS_XML_Parser_V7_folder.spec --distpath dist_v7_folder --workpath build_v7_folder
 ```
 
 Both specs share the same code and the same exclude list; they differ only in onefile vs onedir packaging.
@@ -90,7 +91,8 @@ Requires `psutil` for RAM/CPU metrics (`pip install psutil`).
 
 ```
 nokia-oss-xml-parser/
-├── oss_xml_to_xlsx_v6.6.py   ← current release (V6.6)
+├── oss_xml_to_xlsx_v7.py     ← current release (V7)
+├── oss_xml_to_xlsx_v6.6.py   ← previous release (V6.6)
 ├── oss_xml_to_xlsx_v6.5.py   ← previous release (V6.5)
 ├── oss_xml_to_xlsx_v6.4.py   ← previous release (V6.4)
 ├── oss_xml_to_xlsx_v6.3.py   ← previous release (V6.3)
@@ -119,10 +121,18 @@ nokia-oss-xml-parser/
 │   ├── xlsx_reader.py
 │   └── reports/
 │       └── lnbts_summary.py
+├── 5g_tool/                  ← 5G NR summary report package
+│   ├── main.py
+│   ├── network.py
+│   ├── xlsx_reader.py
+│   └── reports/
+│       └── nrbts_summary.py
 ├── hw_tool/                  ← HW inventory report package
 │   ├── main.py
 │   └── report.py
 ├── spec/                     ← PyInstaller build specs
+│   ├── OSS_XML_Parser_V7.spec
+│   ├── OSS_XML_Parser_V7_folder.spec
 │   ├── OSS_XML_Parser_V6.6.spec
 │   ├── OSS_XML_Parser_V6.6_folder.spec
 │   ├── OSS_XML_Parser_V6.5.10.spec
@@ -148,6 +158,8 @@ nokia-oss-xml-parser/
 │   ├── version_info_v659.txt
 │   ├── version_info_v658.txt
 │   ├── version_info_v657.txt
+│   ├── version_info_v7.txt
+│   ├── version_info_v66.txt
 │   ├── version_info_v656.txt
 │   ├── version_info_v655.txt
 │   ├── version_info_v654.txt
@@ -173,7 +185,8 @@ nokia-oss-xml-parser/
 
 | Version | Key improvement |
 |---------|----------------|
-| **V6.6** | Zero-touch pipeline — the main process no longer handles records at all: 3–4× faster end to end (5 M-object LTE dump 193 s → 50 s), ~5× less RAM (13.4 → 2.6 GB), same cell values |
+| **V7** | **5G NR Summary report** (`5g_tool`, from NRBTS + NRCELL): NRBTS Details, NRCELL Details (21 columns), Network Stats. Also fixes 4G CAREL Correction proposing no deletes on the post-conversion path |
+| V6.6 | Zero-touch pipeline — the main process no longer handles records at all: 3–4× faster end to end (5 M-object LTE dump 193 s → 50 s), ~5× less RAM (13.4 → 2.6 GB), same cell values |
 | V6.5.10 | Exe rebuild: 4G `CA Relation Audit` no longer requires a relation back from the peer cell (CAREL is per-cell) |
 | V6.5.9 | 2G `Cell Details`: CDED/CDEF now round up instead of down — 997 cells had been reporting 0 GPRS channels despite having capacity configured |
 | V6.5.8 | Packaging only (no code change): 40% smaller (23.6 -> 14.1 MB) by dropping unused Pillow / Pythonwin+MFC / OpenSSL, `upx=False` pinned, plus a new folder (onedir) build that avoids the `%TEMP%` extraction corporate policies block |
