@@ -2,6 +2,46 @@
 
 ---
 
+## Version 7 — October 2026  (`oss_xml_to_xlsx_v7.py`)
+
+### Added — 5G NR Summary report (`5g_tool`)
+New `5g_tool/`, built from the `NRBTS` and `NRCELL` sheets, producing a three-sheet workbook. Offered as a **5G Summary** tick-box in the summary dialog whenever both classes are present, and written as `<base>_5G_Summary.xlsx` — same shape as the existing 2G/3G/4G/HW tools, so it slots into the same flow.
+
+**NRBTS Details** — one row per gNB: `MRBTS ID | NRBTS ID | NRBTS Name | SW Version | Cell Count | Band Count | Band List`. Band is derived from the NRBTS's cells' `nrarfcn`, since NRBTS carries no band field of its own.
+
+**NRCELL Details** — one row per cell, 21 columns: `MRBTS ID | NRBTS ID | NRBTS Name | NRCELL ID | Name | Cell Name | Sector ID | Admin State | TAC | PCI | RSI | NRARFCN | Bandwidth (MHz) | SSPBCH Block Power (dBm) | CSIRS Power (dBm) | Mimo Mode | Tilt Offset | Tilt | Left Edge Angle | Right Edge Angle | Beam Set in Use`.
+
+Field mapping, for the record — several of these needed hunting through NRCELL's 774 populated columns:
+
+| Column | Source |
+|---|---|
+| Sector ID | trailing number of `cellName` (`<SITE>_NR_<n>`; matched all 1,304 cells) |
+| Admin State | `administrativeState` — **2 = Working, 0 = Locked**, *not* the LNCEL 1/3 enum `4g_tool` decodes |
+| TAC | `configuredEpsTac` |
+| PCI / RSI | `physCellId` / `prachRootSequenceIndex` |
+| Bandwidth | `chBw` — already in MHz, so unlike LTE's `dlChBw` it is **not** divided by 10 |
+| SSPBCH / CSIRS power | `ssPbchBlockPower` / `Item-periodicCsiAcquisition-csirsPower` |
+| Mimo Mode | `dlMimoMode`, decoded with the 5G enum (12/30/40/50/60/70) — deliberately *not* the LTE map, which has no entry for 70 and would mislabel 64% of cells |
+| Tilt / Tilt Offset | `angle` / `Item-beamSet-tiltOffset` |
+| Edge angles, Beam Set | `Item-beamSet-leftEdgeAngle` / `rightEdgeAngle` / `beamSetInUse` |
+
+Two columns are legitimately sparse on the 21-Oct dump: **CSIRS Power** (832/1,304 = 64%, only where `periodicCsiAcquisition` is configured) and **Tilt** (467/1,304 = 36%). Everything else is 100% populated.
+
+**Network Stats** — Working/Other/Total for NRBTS and NR cells (a site counts as working if any of its cells is unlocked), plus a cells-per-NRARFCN breakdown with the bandwidths seen on each.
+
+Also carried over from `4g_tool`'s conventions: a cell's `Admin State` is highlighted red when locked, and a duplicate `PCI`+`NRARFCN` within the same MRBTS is highlighted red (the NR analogue of the existing RSI+EARFCN check). Zero duplicates on the 21-Oct dump.
+
+Verified against the real `5G.211026.xlsb` (648 NRBTS, 1,304 NRCELL): all 21 columns populated as above, Mimo/Admin decodes correct, sector parse clean (1:441, 2:445, 3:409, 4:6, 5:2, 6:1).
+
+### Fixed — 4G CAREL Correction proposed no deletes on the post-conversion path
+`_SUMMARY_SHEETS`, the whitelist that `pre_read` is filtered through before being handed to the summary tools, never had `CAREL` added when `4g_tool` gained the CAREL Correction sheet. Anything missing from that whitelist is simply invisible to the tools regardless of what they declare, so a 4G summary generated **straight after a conversion** saw zero CA relations — CAREL Correction then proposed only "Create" rows and never a single "Delete", and inflated the Create count by re-proposing relations that already existed.
+
+V6.5.7 fixed the identical omission in `_run_4g_summary`'s own sheet list, but that copy only covers the *"summary from an already-parsed file"* path; this whitelist covers the post-conversion path, and was missed. Both are now correct.
+
+The whitelist is a hand-maintained union and has now drifted twice, so it carries a sync warning, and V7 adds a check that cross-references it against every tool's declared `Network.NEEDED_SHEETS` (all four currently clean). Unaffected: `nokia-kpi-scripts`' `DumpWatcher2.py`, which has its own runner reading `Network.NEEDED_SHEETS` directly, so the scheduled 4G summary was always correct.
+
+> Note: `_post_process_summaries()` has a second, similar list with the same `CAREL` gap. That function is **dead code** in V6.5 and V6.6 (never called), so it was never doing harm; it is fixed in V7 anyway rather than left as a trap.
+
 ## Version 6.6 — October 2026  (`oss_xml_to_xlsx_v6.6.py`)
 
 ### Improved — "zero-touch" pipeline: 3–4× faster, ~5× less memory
